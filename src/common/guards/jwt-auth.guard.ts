@@ -23,7 +23,6 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = this.auth.verifyToken(token);
-      // @ts-ignore - 필요시 Request 타입에 사용자 필드 추가
       req.user = payload;
       return true;
     } catch {
