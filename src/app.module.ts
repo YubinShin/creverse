@@ -6,6 +6,7 @@ import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { StudentsModule } from './modules/students/students.module';
 import { SubmissionsModule } from './modules/submissions/submissions.module';
+import { PublisherModule } from './publisher/publisher.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SubmissionsModule } from './modules/submissions/submissions.module';
     AuthModule,
     StudentsModule,
     SubmissionsModule,
+    PublisherModule,
   ],
   controllers: [AuthController],
   providers: [],
