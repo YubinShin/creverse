@@ -1,4 +1,4 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { NextFunction, Request, Response } from 'express';
@@ -63,7 +63,12 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new HttpResponseTransformFilter());
 
-  app.setGlobalPrefix('v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: 'docs', method: RequestMethod.ALL },
+      { path: 'docs-json', method: RequestMethod.ALL },
+    ],
+  });
   app.enableVersioning({ type: VersioningType.URI });
 
   app.use('/public', express.static(join(process.cwd(), 'public')));
@@ -78,7 +83,8 @@ async function bootstrap() {
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
+  SwaggerModule.setup('docs', app, document, {
+    useGlobalPrefix: false,
     swaggerOptions: { persistAuthorization: true },
   });
 
