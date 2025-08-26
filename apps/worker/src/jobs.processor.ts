@@ -1,5 +1,8 @@
 import { AiService } from '@app/ai';
-import { detectLeftBoundaryX } from '@app/common/media/boundary-detector';
+import {
+  detectLeftBoundaryX,
+  detectWhiteBoundaryX,
+} from '@app/common/media/boundary-detector';
 import { sanitizeCropRectForVideo } from '@app/common/media/crop-utils';
 import { cropVideo } from '@app/common/media/cropper';
 import { extractMp3 } from '@app/common/media/mp3-extractor';
@@ -54,22 +57,33 @@ export class JobsProcessor extends WorkerHost {
       const outMp3 = `${filePath}.audio.mp3`;
 
       const { width, height } = await getVideoSizeFast(filePath);
-      const { x: detectedX } = await detectLeftBoundaryX(
-        filePath,
-        width,
-        height,
-        {
-          blurSigma: 2.0,
-        },
-      ).catch(() => ({ x: null }));
+      // const { x: detectedX } = await detectLeftBoundaryX(
+      //   filePath,
+      //   width,
+      //   height,
+      //   {
+      //     satThresh: 0.08,
+      //     gradThresh: 8,
+      //     minRun: 3,
+      //   },
+      // ).catch(() => ({ x: null }));
 
+      // const fallbackX = Math.floor(width * 0.17);
+      // const maxX = Math.floor(width * 0.5);
+      // const x = Math.min(detectedX ?? fallbackX, maxX);
+
+      const detectedX = await detectWhiteBoundaryX(filePath, width, height, {
+        whiteThresh: 220,
+        minRun: 6,
+      }).catch(() => null);
       const fallbackX = Math.floor(width * 0.17);
-      const maxX = Math.floor(width * 0.5);
-      const x = Math.min(detectedX ?? fallbackX, maxX);
-
-      const MIN_WIDTH = Math.floor(width * 0.4);
-      const cropWidth = Math.max(MIN_WIDTH, width - x);
-      const rawRect = { x, y: 0, w: cropWidth, h: height };
+      const x = Math.min(detectedX ?? fallbackX, Math.floor(width * 0.7));
+      const rawRect = {
+        x: x + 10,
+        y: 0,
+        w: Math.max(1, width - x - 10),
+        h: height,
+      };
       const rect = sanitizeCropRectForVideo(rawRect, width, height);
 
       console.log('[worker] input=', width, 'x', height, 'rect=', rect);
