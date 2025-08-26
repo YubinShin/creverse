@@ -1,5 +1,12 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
+  // output   = "./generated"
 }
 
 datasource db {
@@ -27,10 +34,12 @@ model Submission {
   lastError           String?         @map("last_error")
   score               Int?
   feedback            String?
-  highlights          String?
+  highlights          Json?
   highlightSubmitText String?         @map("highlight_submit_text")
-  videoPath           String?         @map("video_path")
-  audioPath           String?         @map("audio_path")
+  videoPath           String?         @map("video_path") // 로컬 경로
+  audioPath           String?         @map("audio_path") // 로컬 경로
+  videoUrl            String?         @map("video_url") // Blob URL
+  audioUrl            String?         @map("audio_url") // Blob URL
   apiLatency          Int?            @map("api_latency")
   createdAt           DateTime        @default(now()) @map("created_at")
   updatedAt           DateTime        @updatedAt @map("updated_at")
@@ -65,4 +74,21 @@ model Revision {
   createdAt    DateTime   @default(now()) @map("created_at")
 
   @@map("revision")
+}
+
+model HttpLog {
+  id        Int      @id @default(autoincrement())
+  uri       String
+  method    String
+  status    Int
+  latencyMs Int?     @map("latency_ms")
+  traceId   String?  @map("trace_id")
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 조회 성능용 인덱스
+  @@index([createdAt], map: "idx_http_log_created_at")
+  @@index([uri], map: "idx_http_log_uri")
+  @@index([traceId], map: "idx_http_log_trace")
+  @@map("http_log")
 }

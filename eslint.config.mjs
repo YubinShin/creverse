@@ -56,7 +56,12 @@ export default tseslint.config(
     settings: {
       'import/resolver': {
         typescript: {
-          project: './tsconfig.json', // 경로 명확히
+          project: [
+            './tsconfig.base.json',
+            './apps/*/tsconfig.app.json',
+            './libs/*/tsconfig.lib.json',
+          ],
+          alwaysTryTypes: true,
         },
       },
     },

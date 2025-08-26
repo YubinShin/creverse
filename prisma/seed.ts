@@ -1,6 +1,7 @@
 /* prisma/seed.ts */
-import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+
 import { sign } from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
@@ -73,19 +74,18 @@ async function main() {
   );
 
   // 4) 콘솔 출력
-  // eslint-disable-next-line no-console
+
   console.log('✅ Seed complete.');
-  // eslint-disable-next-line no-console
+
   console.log('Students:', { alice: alice.id, bob: bob.id });
-  // eslint-disable-next-line no-console
+
   console.log('Submissions:', { s1: s1.id, s2: s2.id });
-  // eslint-disable-next-line no-console
+
   console.log('Demo JWT:', token);
 }
 
 main()
   .catch((e) => {
-    // eslint-disable-next-line no-console
     console.error(e);
     process.exit(1);
   })
