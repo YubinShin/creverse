@@ -8,6 +8,7 @@ import {
 } from '@azure/storage-blob';
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs-extra';
+import { LoggedHttpService } from '@app/common/http/logged-http.service';
 
 const CONN = process.env.AZURE_CONNECTION_STRING!;
 const CONTAINER = process.env.AZURE_CONTAINER ?? 'processed';
@@ -37,6 +38,11 @@ function explainAzureError(e: any) {
 
 @Injectable()
 export class AzureStorage {
+  constructor(
+    private readonly blobServiceClient: BlobServiceClient,
+    private readonly logger: LoggedHttpService, // or LoggedHttpService
+  ) {}
+
   private readonly container = client.getContainerClient(CONTAINER);
 
   /**
@@ -47,6 +53,7 @@ export class AzureStorage {
     localPath: string,
     contentType?: string,
     ttlMinutes = 60,
+    traceId?: string,
   ): Promise<string> {
     const bp = normalize(blobPath);
 
@@ -72,6 +79,8 @@ export class AzureStorage {
     const stat = await fs.stat(localPath).catch(() => null);
     if (!stat?.isFile()) throw new Error(`Local file not found: ${localPath}`);
 
+    const start = Date.now();
+
     try {
       await blob.uploadFile(localPath, {
         blobHTTPHeaders: {
@@ -79,8 +88,26 @@ export class AzureStorage {
           blobCacheControl: 'public, max-age=300',
         },
       });
+
+      this.logger.log({
+        traceId,
+        action: 'azure_upload',
+        path: bp,
+        status: 'ok',
+        latency: Date.now() - start,
+      });
+
       console.log('[azure] uploadFile OK');
     } catch (e) {
+      this.logger.error({
+        traceId,
+        action: 'azure_upload',
+        path: bp,
+        status: 'failed',
+        latency: Date.now() - start,
+        message: explainAzureError(e),
+      });
+
       console.error('[azure] uploadFile failed:', explainAzureError(e));
       throw e;
     }

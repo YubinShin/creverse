@@ -1,3 +1,4 @@
+import { LoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -16,6 +17,7 @@ import { SubmissionsModule } from './submissions/submissions.module';
     StudentsModule,
     SubmissionsModule,
     PublisherModule,
+    LoggerModule,
   ],
   controllers: [AuthController],
   providers: [],

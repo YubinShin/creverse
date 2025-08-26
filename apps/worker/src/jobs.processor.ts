@@ -7,6 +7,7 @@ import { getVideoSizeFast } from '@app/common/media/video-meta';
 import { PrismaService } from '@app/prisma';
 import { AzureStorage } from '@app/storage'; // 예: libs/storage/src/azure.util.ts에서 export
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
 
 type ProcessJob = { submissionId: number; traceId?: string; filePath?: string };
@@ -45,11 +46,16 @@ export class JobsProcessor extends WorkerHost {
 
       const { mp4Url, mp3Url, outMp3 } = await this.handleMediaProcessing(
         submissionId,
+        traceId!,
         filePath,
       );
       await this.verifySasUrls(mp4Url, mp3Url);
 
-      const ai = await this.runAiEvaluation(sub.submitText, sub.componentType);
+      const ai = await this.runAiEvaluation(
+        sub.submitText,
+        sub.componentType,
+        traceId!,
+      );
 
       await this.updateSubmissionResult(submissionId, {
         mp4Url,
@@ -100,7 +106,11 @@ export class JobsProcessor extends WorkerHost {
     });
   }
 
-  private async handleMediaProcessing(submissionId: number, filePath?: string) {
+  private async handleMediaProcessing(
+    submissionId: number,
+    traceId: string,
+    filePath?: string,
+  ) {
     if (!filePath) throw new Error('missing input video path');
 
     const outMp4 = `${filePath}.cropped.mp4`;
@@ -132,12 +142,14 @@ export class JobsProcessor extends WorkerHost {
       outMp4,
       'video/mp4',
       60,
+      traceId,
     );
     const mp3Url = await this.storage.uploadFileAndGetSas(
       `submissions/${submissionId}/audio.mp3`,
       outMp3,
       'audio/mpeg',
       60,
+      traceId,
     );
     console.log('[phase] azure-upload ok', { mp4Url, mp3Url });
 
@@ -150,11 +162,16 @@ export class JobsProcessor extends WorkerHost {
     console.log('[phase] sas-verify ok', v1, v2);
   }
 
-  private async runAiEvaluation(text: string, componentType: string) {
+  private async runAiEvaluation(
+    text: string,
+    componentType: string,
+    traceId: string,
+  ) {
     console.log('[phase] ai-evaluate start');
     const result = await this.ai.evaluate({
       submitText: text ?? '',
       componentType,
+      traceId,
     });
     console.log('[phase] ai-evaluate ok');
     return result;

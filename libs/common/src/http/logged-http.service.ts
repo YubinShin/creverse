@@ -1,13 +1,15 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { AxiosResponse } from 'axios';
+import { Logger as PinoLogger } from 'pino';
 import { catchError, lastValueFrom, map, tap } from 'rxjs';
 
 @Injectable()
 export class LoggedHttpService {
-  private readonly logger = new Logger(LoggedHttpService.name);
-
-  constructor(private readonly http: HttpService) {}
+  constructor(
+    private readonly http: HttpService,
+    @Inject('LOGGER') private readonly logger: PinoLogger,
+  ) {}
 
   async postWithLog<T = unknown>(
     url: string,
@@ -21,7 +23,7 @@ export class LoggedHttpService {
     return await lastValueFrom(
       this.http.post<T>(url, data, config).pipe(
         tap((response) => {
-          this.logger.log({
+          this.logger.info({
             traceId,
             label,
             url,
