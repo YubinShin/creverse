@@ -1,6 +1,13 @@
+import { LoggedHttpService } from '@app/common/http/logged-http.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-
+interface ChatCompletionResponse {
+  choices: {
+    message: {
+      content: string;
+    };
+  }[];
+}
 export type AiEvalResult = {
   score: number;
   feedback: string;
@@ -13,16 +20,17 @@ const AiEvalSchema = z.object({
   highlights: z.array(z.string()).default([]),
 });
 
-function safeParseJson(s: string) {
+function safeParseJson<T>(s: string): { ok: true; data: T } | { ok: false } {
   try {
-    return { ok: true as const, data: JSON.parse(s) };
+    return { ok: true as const, data: JSON.parse(s) as T };
   } catch {
     return { ok: false as const };
   }
 }
-
 @Injectable()
 export class AiService {
+  constructor(private readonly loggedHttp: LoggedHttpService) {}
+
   private readonly apiVersion = process.env.OPENAPI_API_VERSION ?? '2023-05-15';
   private readonly endpoint = process.env.AZURE_ENDPOINT_URL!.replace(
     /\/+$/,
@@ -35,6 +43,7 @@ export class AiService {
   async evaluate(params: {
     submitText: string;
     componentType: string;
+    traceId: string;
   }): Promise<AiEvalResult> {
     const systemPrompt = `
 You are a strict grader. Output must be valid JSON only, without any extra explanation.
@@ -72,22 +81,20 @@ Language: Korean only.
       ],
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'api-key': this.key,
-        'Content-Type': 'application/json',
+    const json = await this.loggedHttp.postWithLog<ChatCompletionResponse>(
+      url,
+      body,
+      {
+        headers: {
+          'api-key': this.key,
+          'Content-Type': 'application/json',
+        },
       },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => `${res.status}`);
-      throw new Error(`[AiService] request failed: ${res.status} ${text}`);
-    }
-
-    const json = await res.json();
-    const rawContent = json?.choices?.[0]?.message?.content ?? '';
+      params.traceId,
+      'call_openai',
+    );
+    const rawContent =
+      json.choices?.[0]?.message?.content ?? 'fallback response';
 
     const parsed = this.parseResult(rawContent);
 
