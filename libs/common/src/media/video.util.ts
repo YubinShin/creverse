@@ -106,12 +106,19 @@ export async function cropVideo(
   outputPath: string,
   rect: CropRect,
 ) {
+  const { width, height } = await getVideoSize(inputPath);
+  const x = Math.max(0, Math.floor(rect.x));
+  const y = Math.max(0, Math.floor(rect.y));
+  const w = Math.max(1, Math.min(Math.floor(rect.w), width - x));
+  const h = Math.max(1, Math.min(Math.floor(rect.h), height - y));
+
   await ensureDir(dirname(outputPath));
   await new Promise<void>((resolve, reject) => {
     ffmpeg(inputPath)
-      .videoFilter(`crop=${rect.w}:${rect.h}:${rect.x}:${rect.y}`)
+      .videoFilter(`crop=${w}:${h}:${x}:${y}`)
       .noAudio()
       .outputOptions(['-y'])
+      .on('start', (cmd) => console.log('[FFmpeg cmd]', cmd))
       .on('end', () => resolve())
       .on('error', (e) => reject(e instanceof Error ? e : new Error(String(e))))
       .save(outputPath);
@@ -176,27 +183,39 @@ export async function detectLeftBoundaryX(
     minRun?: number;
     satThresh?: number;
     gradThresh?: number;
+    blurSigma?: number;
   },
 ): Promise<number | null> {
   const samples = opts?.samples ?? 3;
   const minRun = opts?.minRun ?? 8;
-  const satT = opts?.satThresh ?? 0.12; // now used
-  const gradT = opts?.gradThresh ?? 12; // now used
+  const satT = opts?.satThresh ?? 0.12;
+  const gradT = opts?.gradThresh ?? 12;
+  const blurSigma = opts?.blurSigma ?? 2.0;
 
   const { width, height } = await getVideoSize(inputPath);
   if (!width || !height) return null;
 
   const tgtH = 360;
   const ss = [0.25, 0.5, 0.75].slice(0, samples);
-
   const accum = new Array<number>(Math.round((width * tgtH) / height)).fill(0);
   let W = accum.length;
 
+  let detectedX: number | null = null;
+
   for (const r of ss) {
     const png = await extractThumb(inputPath, r, tgtH);
-    const { data, info } = await sharp(png)
+    const originalDebugPath = `debug_original_${Math.round(r * 100)}.png`;
+    const blurredDebugPath = `debug_blurred_${Math.round(r * 100)}.png`;
+
+    await sharp(png).toFile(originalDebugPath);
+
+    const blurred = sharp(png).blur(blurSigma);
+    await blurred.toFile(blurredDebugPath);
+
+    const { data, info } = await blurred
       .raw()
       .toBuffer({ resolveWithObject: true });
+
     W = info.width;
 
     const colScore = columnActivityScore(
@@ -206,23 +225,61 @@ export async function detectLeftBoundaryX(
       satT,
       gradT,
     );
+
     for (let x = 0; x < W; x++) accum[x] += colScore[x];
+
     await fs.unlink(png).catch(() => {});
   }
+
   for (let x = 0; x < W; x++) accum[x] /= ss.length;
 
-  const thr = 1.0; // because we normalized by satT and gradT below
+  const thr = 1.0;
   let run = 0;
-  for (let x = 0; x < W; x++) {
+  for (let x = W - 1; x >= 0; x--) {
     if (accum[x] >= thr) {
       run++;
       if (run >= minRun) {
-        const xRatio = (x - minRun + 1) / W;
-        return Math.max(0, Math.floor(width * xRatio));
+        const xRatio = (x + minRun - 1) / W;
+        detectedX = Math.max(0, Math.floor(width * xRatio));
+        break;
       }
-    } else run = 0;
+    } else {
+      run = 0;
+    }
   }
-  return null;
+
+  // 🔴 시각화 이미지 생성
+  if (detectedX !== null) {
+    const visSample = ss[Math.floor(ss.length / 2)];
+    const blurredDebugPath = `debug_blurred_${Math.round(visSample * 100)}.png`;
+    const resultPath = `debug_result_${Math.round(visSample * 100)}.png`;
+
+    const blurredImage = sharp(blurredDebugPath);
+    const { width: debugW, height: debugH } = await blurredImage.metadata();
+
+    const drawX = Math.floor(detectedX * (debugW! / width));
+
+    const overlayBuffer = Buffer.alloc(debugW! * debugH! * 4, 0);
+    for (let y = 0; y < debugH!; y++) {
+      const i = (y * debugW! + drawX) * 4;
+      overlayBuffer[i] = 255; // R
+      overlayBuffer[i + 1] = 0; // G
+      overlayBuffer[i + 2] = 0; // B
+      overlayBuffer[i + 3] = 255; // A
+    }
+
+    await blurredImage
+      .composite([
+        {
+          input: overlayBuffer,
+          raw: { width: debugW!, height: debugH!, channels: 4 },
+          blend: 'overlay',
+        },
+      ])
+      .toFile(resultPath);
+  }
+
+  return detectedX;
 }
 
 function columnActivityScore(
