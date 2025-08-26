@@ -1,8 +1,5 @@
 import { AiService } from '@app/ai';
-import {
-  detectLeftBoundaryX,
-  detectWhiteBoundaryX,
-} from '@app/common/media/boundary-detector';
+import { detectWhiteBoundaryX } from '@app/common/media/boundary-detector';
 import { sanitizeCropRectForVideo } from '@app/common/media/crop-utils';
 import { cropVideo } from '@app/common/media/cropper';
 import { extractMp3 } from '@app/common/media/mp3-extractor';
@@ -44,153 +41,24 @@ export class JobsProcessor extends WorkerHost {
     console.log('[worker] start', job.id, job.data);
 
     try {
-      const sub = await this.prisma.submission.update({
-        where: { id: submissionId },
-        data: { status: 'PROCESSING' },
-        select: { id: true, componentType: true, submitText: true },
+      const sub = await this.markProcessing(submissionId);
+
+      const { mp4Url, mp3Url, outMp3 } = await this.handleMediaProcessing(
+        submissionId,
+        filePath,
+      );
+      await this.verifySasUrls(mp4Url, mp3Url);
+
+      const ai = await this.runAiEvaluation(sub.submitText, sub.componentType);
+
+      await this.updateSubmissionResult(submissionId, {
+        mp4Url,
+        mp3Url,
+        outMp3,
+        ai,
+        submitText: sub.submitText,
+        started,
       });
-
-      // 1) 영상 크롭 + 오디오 추출
-      if (!filePath) throw new Error('missing input video path');
-
-      const outMp4 = `${filePath}.cropped.mp4`;
-      const outMp3 = `${filePath}.audio.mp3`;
-
-      const { width, height } = await getVideoSizeFast(filePath);
-      // const { x: detectedX } = await detectLeftBoundaryX(
-      //   filePath,
-      //   width,
-      //   height,
-      //   {
-      //     satThresh: 0.08,
-      //     gradThresh: 8,
-      //     minRun: 3,
-      //   },
-      // ).catch(() => ({ x: null }));
-
-      // const fallbackX = Math.floor(width * 0.17);
-      // const maxX = Math.floor(width * 0.5);
-      // const x = Math.min(detectedX ?? fallbackX, maxX);
-
-      const detectedX = await detectWhiteBoundaryX(filePath, width, height, {
-        whiteThresh: 220,
-        minRun: 6,
-      }).catch(() => null);
-      const fallbackX = Math.floor(width * 0.17);
-      const x = Math.min(detectedX ?? fallbackX, Math.floor(width * 0.7));
-      const rawRect = {
-        x: x + 10,
-        y: 0,
-        w: Math.max(1, width - x - 10),
-        h: height,
-      };
-      const rect = sanitizeCropRectForVideo(rawRect, width, height);
-
-      console.log('[worker] input=', width, 'x', height, 'rect=', rect);
-
-      await cropVideo(filePath, outMp4, rect);
-      await extractMp3(filePath, outMp3);
-      // // 2) Azure Blob 업로드(Private) + SAS URL 발급
-      // let mp4Url: string, mp3Url: string;
-      // try {
-      //   console.log('[phase] azure-upload start');
-      //   mp4Url = await this.storage.uploadFileAndGetSas(
-      //     `submissions/${submissionId}/video.mp4`,
-      //     outMp4,
-      //     'video/mp4',
-      //     60,
-      //   );
-      //   mp3Url = await this.storage.uploadFileAndGetSas(
-      //     `submissions/${submissionId}/audio.mp3`,
-      //     outMp3,
-      //     'audio/mpeg',
-      //     60,
-      //   );
-      //   console.log('[phase] azure-upload ok', { mp4Url, mp3Url });
-      // } catch (e) {
-      //   const msg = e instanceof Error ? e.message : String(e);
-      //   console.error('[phase] azure-upload failed:', msg);
-      //   await log('failed', `azure-upload: ${msg}`);
-      //   throw e;
-      // }
-      //
-      // // 2.1) SAS URL 가볍게 HEAD/GET으로 점검 (네트워크 404 확인)
-      // try {
-      //   console.log('[phase] sas-verify start');
-      //   const [v1, v2] = await Promise.all([
-      //     fetchHead(mp4Url),
-      //     fetchHead(mp3Url),
-      //   ]);
-      //   console.log('[phase] sas-verify ok', v1, v2);
-      // } catch (e) {
-      //   const msg = e instanceof Error ? e.message : String(e);
-      //   console.error('[phase] sas-verify failed:', msg);
-      //   await log('failed', `sas-verify: ${msg}`);
-      //   throw e;
-      // }
-      //
-      // // 3) AI 평가 호출
-      // let ai: { score: number; feedback: string; highlights: any[] };
-      // try {
-      //   console.log('[phase] ai-evaluate start');
-      //   ai = await this.ai.evaluate({
-      //     submitText: sub.submitText ?? '',
-      //     componentType: sub.componentType,
-      //     // videoUrl: mp4Url, // ← 추가
-      //     // audioUrl: mp3Url, // ← 추가
-      //   });
-      //   console.log('[phase] ai-evaluate ok');
-      // } catch (e) {
-      //   const err = e as any;
-      //   // axios 류 에러면 응답 본문까지 찍어 문제를 바로 확인
-      //   console.error(
-      //     '[phase] ai-evaluate failed:',
-      //     err?.response?.status,
-      //     err?.response?.statusText,
-      //     err?.response?.data ?? err?.message ?? err,
-      //   );
-      //   await log(
-      //     'failed',
-      //     `ai-evaluate: ${err?.response?.status} ${err?.response?.statusText}`,
-      //   );
-      //   throw e;
-      // }
-      //
-      // // const highlighted = highlightHtml(sub.submitText ?? '', ai.highlights);
-      //
-      // // 4) DB 저장
-      // try {
-      //   console.log('[phase] db-update start');
-      //   await this.prisma.submission.update({
-      //     where: { id: submissionId },
-      //     data: {
-      //       status: 'COMPLETED',
-      //       videoUrl: mp4Url,
-      //       audioUrl: mp3Url,
-      //       audioPath: outMp3,
-      //       score: Math.max(0, Math.min(10, Math.floor(ai.score))), // 0~10 정수 보정
-      //       feedback: ai.feedback?.slice(0, 2000) ?? null,
-      //       highlights: ai.highlights as unknown as Prisma.InputJsonValue, // string[]
-      //       highlightSubmitText: highlightHtmlByStrings(
-      //         sub.submitText ?? '',
-      //         ai.highlights,
-      //       ), // ← 여기만 교체
-      //       apiLatency: Date.now() - started,
-      //       lastError: null,
-      //     },
-      //   });
-      //
-      //   console.log('[phase] db-update ok');
-      // } catch (e) {
-      //   const msg = e instanceof Error ? e.message : String(e);
-      //   console.error('[phase] db-update failed:', msg);
-      //   await log('failed', `db-update: ${msg}`);
-      //   throw e;
-      // }
-      //
-      // await log('ok', `completed in ${Date.now() - started}ms`);
-      // console.log('[worker] done', job.id);
-      // return { ok: true, jobId: job.id };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await this.prisma.submission.update({
@@ -222,6 +90,109 @@ export class JobsProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   onFailed(job: Job, err: Error) {
     console.error('[worker:event] failed', job.id, err.message);
+  }
+
+  private async markProcessing(submissionId: number) {
+    return this.prisma.submission.update({
+      where: { id: submissionId },
+      data: { status: 'PROCESSING' },
+      select: { id: true, componentType: true, submitText: true },
+    });
+  }
+
+  private async handleMediaProcessing(submissionId: number, filePath?: string) {
+    if (!filePath) throw new Error('missing input video path');
+
+    const outMp4 = `${filePath}.cropped.mp4`;
+    const outMp3 = `${filePath}.audio.mp3`;
+
+    const { width, height } = await getVideoSizeFast(filePath);
+    const detectedX = await detectWhiteBoundaryX(filePath, width, height, {
+      whiteThresh: 220,
+      minRun: 6,
+    }).catch(() => null);
+    const fallbackX = Math.floor(width * 0.17);
+    const x = Math.min(detectedX ?? fallbackX, Math.floor(width * 0.7));
+
+    const rawRect = {
+      x: x + 10,
+      y: 0,
+      w: Math.max(1, width - x - 10),
+      h: height,
+    };
+    const rect = sanitizeCropRectForVideo(rawRect, width, height);
+    console.log('[worker] input=', width, 'x', height, 'rect=', rect);
+
+    await cropVideo(filePath, outMp4, rect);
+    await extractMp3(filePath, outMp3);
+
+    console.log('[phase] azure-upload start');
+    const mp4Url = await this.storage.uploadFileAndGetSas(
+      `submissions/${submissionId}/video.mp4`,
+      outMp4,
+      'video/mp4',
+      60,
+    );
+    const mp3Url = await this.storage.uploadFileAndGetSas(
+      `submissions/${submissionId}/audio.mp3`,
+      outMp3,
+      'audio/mpeg',
+      60,
+    );
+    console.log('[phase] azure-upload ok', { mp4Url, mp3Url });
+
+    return { mp4Url, mp3Url, outMp3 };
+  }
+
+  private async verifySasUrls(mp4Url: string, mp3Url: string) {
+    console.log('[phase] sas-verify start');
+    const [v1, v2] = await Promise.all([fetchHead(mp4Url), fetchHead(mp3Url)]);
+    console.log('[phase] sas-verify ok', v1, v2);
+  }
+
+  private async runAiEvaluation(text: string, componentType: string) {
+    console.log('[phase] ai-evaluate start');
+    const result = await this.ai.evaluate({
+      submitText: text ?? '',
+      componentType,
+    });
+    console.log('[phase] ai-evaluate ok');
+    return result;
+  }
+
+  private async updateSubmissionResult(
+    submissionId: number,
+    opts: {
+      mp4Url: string;
+      mp3Url: string;
+      outMp3: string;
+      ai: { score: number; feedback: string; highlights: any[] };
+      submitText: string;
+      started: number;
+    },
+  ) {
+    const { mp4Url, mp3Url, outMp3, ai, submitText, started } = opts;
+
+    console.log('[phase] db-update start');
+    await this.prisma.submission.update({
+      where: { id: submissionId },
+      data: {
+        status: 'COMPLETED',
+        videoUrl: mp4Url,
+        audioUrl: mp3Url,
+        audioPath: outMp3,
+        score: Math.max(0, Math.min(10, Math.floor(ai.score))),
+        feedback: ai.feedback?.slice(0, 2000) ?? null,
+        highlights: ai.highlights as Prisma.InputJsonValue,
+        highlightSubmitText: highlightHtmlByStrings(
+          submitText ?? '',
+          ai.highlights,
+        ),
+        apiLatency: Date.now() - started,
+        lastError: null,
+      },
+    });
+    console.log('[phase] db-update ok');
   }
 }
 
