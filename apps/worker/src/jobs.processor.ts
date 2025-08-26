@@ -1,12 +1,9 @@
 import { AiService } from '@app/ai';
-import {
-  cropVideo,
-  detectLeftBoundaryX,
-  extractMp3,
-  getVideoSize,
-  safeCropRect,
-} from '@app/common/media/video.util';
-import { notifyOnFailure } from '@app/common/utils/notify.util';
+import { detectLeftBoundaryX } from '@app/common/media/boundary-detector';
+import { sanitizeCropRectForVideo } from '@app/common/media/crop-utils';
+import { cropVideo } from '@app/common/media/cropper';
+import { extractMp3 } from '@app/common/media/mp3-extractor';
+import { getVideoSizeFast } from '@app/common/media/video-meta';
 import { PrismaService } from '@app/prisma';
 import { AzureStorage } from '@app/storage'; // 예: libs/storage/src/azure.util.ts에서 export
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
@@ -56,22 +53,29 @@ export class JobsProcessor extends WorkerHost {
       const outMp4 = `${filePath}.cropped.mp4`;
       const outMp3 = `${filePath}.audio.mp3`;
 
-      const { width, height } = await getVideoSize(filePath);
-      const detectedX = await detectLeftBoundaryX(filePath, {
-        blurSigma: 2.0,
-      }).catch(() => null);
+      const { width, height } = await getVideoSizeFast(filePath);
+      const { x: detectedX } = await detectLeftBoundaryX(
+        filePath,
+        width,
+        height,
+        {
+          blurSigma: 2.0,
+        },
+      ).catch(() => ({ x: null }));
+
       const fallbackX = Math.floor(width * 0.17);
-      const maxX = Math.floor(width * 0.7);
+      const maxX = Math.floor(width * 0.5);
       const x = Math.min(detectedX ?? fallbackX, maxX);
 
-      const rawRect = { x, y: 0, w: Math.max(1, width - x), h: height };
-      const rect = safeCropRect(rawRect, width, height);
+      const MIN_WIDTH = Math.floor(width * 0.4);
+      const cropWidth = Math.max(MIN_WIDTH, width - x);
+      const rawRect = { x, y: 0, w: cropWidth, h: height };
+      const rect = sanitizeCropRectForVideo(rawRect, width, height);
 
       console.log('[worker] input=', width, 'x', height, 'rect=', rect);
 
       await cropVideo(filePath, outMp4, rect);
       await extractMp3(filePath, outMp3);
-
       // // 2) Azure Blob 업로드(Private) + SAS URL 발급
       // let mp4Url: string, mp3Url: string;
       // try {
