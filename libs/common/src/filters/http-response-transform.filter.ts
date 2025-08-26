@@ -20,7 +20,7 @@ export class HttpResponseTransformFilter implements ExceptionFilter {
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
-    const traceId = req?.traceId ?? null;
+    const traceId = (req as { traceId?: string })?.traceId ?? null;
 
     let originalStatus = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal Server Error';

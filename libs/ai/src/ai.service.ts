@@ -1,32 +1,11 @@
+import { safeParseJson } from '@app/common';
 import { LoggedHttpService } from '@app/common/http/logged-http.service';
 import { Injectable, Logger } from '@nestjs/common';
-import { z } from 'zod';
-interface ChatCompletionResponse {
-  choices: {
-    message: {
-      content: string;
-    };
-  }[];
-}
-export type AiEvalResult = {
-  score: number;
-  feedback: string;
-  highlights: string[];
-};
 
-const AiEvalSchema = z.object({
-  score: z.number().int().min(0).max(10),
-  feedback: z.string(),
-  highlights: z.array(z.string()).default([]),
-});
+import { AiEvalSchema } from './const/ai-eval-schema.const';
+import { ChatCompletionResponse } from './interfaces/ai-chat-completion-responses.interface';
+import { AiEvalResult } from './types/ai-eval-result.type';
 
-function safeParseJson<T>(s: string): { ok: true; data: T } | { ok: false } {
-  try {
-    return { ok: true as const, data: JSON.parse(s) as T };
-  } catch {
-    return { ok: false as const };
-  }
-}
 @Injectable()
 export class AiService {
   constructor(private readonly loggedHttp: LoggedHttpService) {}

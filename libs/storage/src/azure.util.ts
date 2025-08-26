@@ -38,10 +38,7 @@ function explainAzureError(e: any) {
 
 @Injectable()
 export class AzureStorage {
-  constructor(
-    private readonly blobServiceClient: BlobServiceClient,
-    private readonly logger: LoggedHttpService, // or LoggedHttpService
-  ) {}
+  constructor(private readonly httpLogger: LoggedHttpService) {}
 
   private readonly container = client.getContainerClient(CONTAINER);
 
@@ -89,7 +86,7 @@ export class AzureStorage {
         },
       });
 
-      this.logger.log({
+      this.httpLogger.log({
         traceId,
         action: 'azure_upload',
         path: bp,
@@ -99,7 +96,7 @@ export class AzureStorage {
 
       console.log('[azure] uploadFile OK');
     } catch (e) {
-      this.logger.error({
+      this.httpLogger.error({
         traceId,
         action: 'azure_upload',
         path: bp,

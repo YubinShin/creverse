@@ -1,16 +1,16 @@
-export function toStartOfDay(dateInput: string | Date) {
-  const d = new Date(dateInput);
-  if (Number.isNaN(+d)) return undefined;
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+// export function toStartOfDay(dateInput: string | Date) {
+//   const d = new Date(dateInput);
+//   if (Number.isNaN(+d)) return undefined;
+//   d.setHours(0, 0, 0, 0);
+//   return d;
+// }
 
-export function toEndOfDay(dateInput: string | Date) {
-  const d = new Date(dateInput);
-  if (Number.isNaN(+d)) return undefined;
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
+// export function toEndOfDay(dateInput: string | Date) {
+//   const d = new Date(dateInput);
+//   if (Number.isNaN(+d)) return undefined;
+//   d.setHours(23, 59, 59, 999);
+//   return d;
+// }
 
 export function safeDateStart(isoLike: string) {
   // 00:00:00 local 기준 → 필요 시 KST/UTC 정책에 따라 조정

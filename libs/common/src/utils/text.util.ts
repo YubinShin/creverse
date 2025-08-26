@@ -68,3 +68,13 @@ export function normalizeRelative(absPath: string) {
   if (rel.startsWith('/')) rel = rel.slice(1);
   return rel; // 예: "uploads/tmp/123-abc.mp4"
 }
+
+export function safeParseJson<T>(
+  s: string,
+): { ok: true; data: T } | { ok: false } {
+  try {
+    return { ok: true as const, data: JSON.parse(s) as T };
+  } catch {
+    return { ok: false as const };
+  }
+}
