@@ -311,3 +311,12 @@ docker-compose up -d
 - Scheduler (Auto-Retry, Stats Job): 향후 BullMQ repeatable jobs로 구현 예정
 - 테스트 코드: Unit/Integration/E2E를 Jest 및 Testcontainers 기반으로 보강할 예정
 - OpenTelemetry 및 모니터링 연동: 추후 적용 계획
+- 
+
+## Author
+
+신유빈 (Yubin Shin)
+
+## License
+
+This project is licensed under the MIT License.
