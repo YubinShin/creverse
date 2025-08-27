@@ -1,8 +1,4 @@
-import {
-  normalizeRelative,
-  safeDateEnd,
-  safeDateStart,
-} from '@app/common/utils';
+import { normalizeRelative, safeDateEnd, safeDateStart } from '@app/common';
 import { PrismaService } from '@app/prisma';
 import {
   BadRequestException,

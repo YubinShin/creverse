@@ -1,6 +1,8 @@
-import { AppConfigModule } from '@app/common/infra';
-import { HttpResponseTransformFilter } from '@app/common/infra/filters';
-import { TraceInterceptor } from '@app/common/infra/interceptors';
+import {
+  AppConfigModule,
+  HttpResponseTransformFilter,
+  TraceInterceptor,
+} from '@app/common';
 import { LoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { Module } from '@nestjs/common';

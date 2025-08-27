@@ -1,5 +1,4 @@
-import { safeParseJson } from '@app/common';
-import { LoggedHttpService } from '@app/common/infra/http';
+import { LoggedHttpService, safeParseJson } from '@app/common';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AiChatCompletionResponse } from './dto/ai-chat-completion-responses.dto';

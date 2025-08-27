@@ -1,12 +1,16 @@
 import { AiService } from '@app/ai';
-import { detectWhiteBoundaryX } from '@app/common/media/boundary-detector';
-import { sanitizeCropRectForVideo } from '@app/common/media/crop-utils';
-import { cropVideo } from '@app/common/media/cropper';
-import { extractMp3 } from '@app/common/media/mp3-extractor';
-import { getVideoSizeFast } from '@app/common/media/video-meta';
+import {
+  cropVideo,
+  detectWhiteBoundaryX,
+  extractMp3,
+  getVideoSizeFast,
+  highlightHtmlByStrings,
+  LoggedHttpService,
+  sanitizeCropRectForVideo,
+} from '@app/common';
 import { LoggerService } from '@app/logger';
 import { PrismaService } from '@app/prisma';
-import { AzureStorageService } from '@app/storage/azure-storage.service';
+import { AzureStorageService } from '@app/storage';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
@@ -22,6 +26,7 @@ export class JobsProcessor extends WorkerHost {
     private readonly ai: AiService,
     private readonly logger: LoggerService,
     private readonly alert: AlertService,
+    private readonly http: LoggedHttpService,
   ) {
     super();
   }
@@ -49,7 +54,7 @@ export class JobsProcessor extends WorkerHost {
         filePath,
         log,
       );
-      await this.verifySasUrls(mp4Url, mp3Url, log);
+      await this.verifySasUrls(traceId ?? '', mp4Url, mp3Url, log);
 
       const ai = await this.runAiEvaluation(
         sub.submitText ?? '',
@@ -175,12 +180,16 @@ export class JobsProcessor extends WorkerHost {
   }
 
   private async verifySasUrls(
+    traceId: string,
     mp4Url: string,
     mp3Url: string,
     log: LoggerService,
   ) {
     log.log({ event: 'phase.sas-verify.start' });
-    const [v1, v2] = await Promise.all([fetchHead(mp4Url), fetchHead(mp3Url)]);
+    const [v1, v2] = await Promise.all([
+      this.http.headWithLog(mp4Url, {}, traceId, 'sas-verify'),
+      this.http.headWithLog(mp3Url, {}, traceId, 'sas-verify'),
+    ]);
     log.log({ event: 'phase.sas-verify.ok', v1, v2 });
   }
 
@@ -232,36 +241,4 @@ export class JobsProcessor extends WorkerHost {
     });
     log.log({ event: 'phase.db-update.ok' });
   }
-}
-
-async function fetchHead(url: string) {
-  const res = await fetch(url, { method: 'HEAD' });
-  if (!res.ok) throw new Error(`HEAD ${res.status} ${res.statusText}`);
-  return { status: res.status, len: res.headers.get('content-length') };
-}
-
-// 문자열 목록으로 하이라이트 (겹침 최소화, 간단 매칭)
-function highlightHtmlByStrings(text: string, items: string[]) {
-  if (!text || !items?.length) return escapeHtml(text);
-
-  const needles = [
-    ...new Set(items.map((s) => s?.trim()).filter(Boolean)),
-  ].sort((a, b) => b.length - a.length);
-
-  let out = escapeHtml(text);
-  for (const n of needles) {
-    const esc = escapeRegExp(n);
-    out = out.replace(new RegExp(esc, 'g'), (m) => `<b>${escapeHtml(m)}</b>`);
-  }
-  return out;
-}
-
-function escapeHtml(s: string) {
-  return s.replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!,
-  );
-}
-function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

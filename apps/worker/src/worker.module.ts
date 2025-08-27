@@ -1,5 +1,5 @@
 import { AiModule } from '@app/ai';
-import { AppConfigModule } from '@app/common/infra';
+import { AppConfigModule, LoggedHttpModule } from '@app/common';
 import { LoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { StorageModule } from '@app/storage';
@@ -33,6 +33,7 @@ import { JobsProcessor } from './jobs.processor';
     StorageModule,
     AiModule,
     AlertModule,
+    LoggedHttpModule,
   ],
   providers: [JobsProcessor],
 })

@@ -2,25 +2,19 @@ import { LoggerService } from '@app/logger';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-export type AlertChannel = 'slack' | 'discord' | 'generic';
-
-export type NotifyOptions = {
-  webhookUrl?: string;
-  channel?: AlertChannel;
-  traceId?: string;
-  extras?: Record<string, unknown>;
-};
+import { AlertChannel, AlertNotifyOptions } from './types';
 
 @Injectable()
 export class AlertService {
-  //   private readonly logger = new Logger(AlertService.name);
-
   constructor(
     private readonly config: ConfigService,
     private readonly logger: LoggerService,
   ) {}
 
-  async notifyOnFailure(message: string, opts?: NotifyOptions): Promise<void> {
+  async notifyOnFailure(
+    message: string,
+    opts?: AlertNotifyOptions,
+  ): Promise<void> {
     const url =
       opts?.webhookUrl ?? this.config.get<string>('ALERT_WEBHOOK_URL');
     if (!url) {

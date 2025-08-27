@@ -1,36 +1,10 @@
 import { ConfigModule } from '@nestjs/config';
-import * as Joi from 'joi';
+
+import { envValidationSchema } from './validation';
 
 export const AppConfigModule = ConfigModule.forRoot({
   isGlobal: true,
-  validationSchema: Joi.object({
-    // Redis
-    REDIS_HOST: Joi.string().default('localhost'),
-    REDIS_PORT: Joi.number().default(6379),
-    REDIS_USERNAME: Joi.string().optional(),
-    REDIS_PASSWORD: Joi.string().optional(),
-    REDIS_TLS: Joi.boolean().default(false),
-
-    // Queue
-    QUEUE_NAME: Joi.string().default('jobs'),
-    QUEUE_DRIVER: Joi.string().valid('bullmq', 'sqs').default('bullmq'),
-    MAX_RETRY: Joi.number().default(3),
-
-    // Azure Storage
-    AZURE_CONNECTION_STRING: Joi.string().required(),
-    AZURE_CONTAINER: Joi.string().required(),
-
-    // DB
-    DATABASE_URL: Joi.string().required(),
-
-    // JWT
-    JWT_SECRET: Joi.string().required(),
-
-    // Optional
-    ACCESS_CODE: Joi.string().optional(),
-    ALERT_WEBHOOK_URL: Joi.string().uri().optional(),
-    TRACE_ID: Joi.string().optional(),
-  }),
+  validationSchema: envValidationSchema,
   load: [
     () => ({
       redis: {
