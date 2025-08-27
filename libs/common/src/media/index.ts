@@ -2,7 +2,7 @@ export * from './boundary-detector';
 export * from './column-score';
 export * from './crop-utils';
 export * from './cropper';
-export * from './debug-visualizer';
+// export * from './debug-visualizer';
 export * from './ffmpeg-config';
 export * from './mp3-extractor';
 export * from './thumb-extractor';
