@@ -1,9 +1,9 @@
 import { safeParseJson } from '@app/common';
-import { LoggedHttpService } from '@app/common/http/logged-http.service';
+import { LoggedHttpService } from '@app/common/infra/http';
 import { Injectable, Logger } from '@nestjs/common';
 
-import { AiEvalSchema } from './const/ai-eval-schema.const';
-import { ChatCompletionResponse } from './interfaces/ai-chat-completion-responses.interface';
+import { AiChatCompletionResponse } from './dto/ai-chat-completion-responses.dto';
+import { AiEvalSchema } from './schema/ai-eval-schema.const';
 import { AiEvalResult } from './types/ai-eval-result.type';
 
 @Injectable()
@@ -60,7 +60,7 @@ Language: Korean only.
       ],
     };
 
-    const json = await this.loggedHttp.postWithLog<ChatCompletionResponse>(
+    const json = await this.loggedHttp.postWithLog<AiChatCompletionResponse>(
       url,
       body,
       {
