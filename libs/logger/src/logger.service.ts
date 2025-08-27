@@ -4,34 +4,54 @@ import pino, { Logger } from 'pino';
 @Injectable()
 export class LoggerService implements NestLoggerService {
   private readonly logger: Logger;
+  private traceId?: string;
 
   constructor() {
     this.logger = pino({
       level: process.env.LOG_LEVEL || 'info',
       transport:
-        process.env.NODE_ENV !== 'production'
-          ? { target: 'pino-pretty', options: { colorize: true } }
-          : undefined,
+        process.env.NODE_ENV === 'production'
+          ? undefined
+          : { target: 'pino-pretty', options: { colorize: true } },
+      base: undefined,
     });
   }
 
-  log(message: any, context?: string) {
-    this.logger.info({ context }, message);
+  setTraceId(traceId: string) {
+    this.traceId = traceId;
   }
 
-  error(message: any, trace?: string, context?: string) {
-    this.logger.error({ trace, context }, message);
+  private withTrace(message: unknown): Record<string, unknown> {
+    if (typeof message === 'string') {
+      return { traceId: this.traceId, message };
+    }
+    if (typeof message === 'object' && message !== null) {
+      return { traceId: this.traceId, ...(message as Record<string, unknown>) };
+    }
+    return { traceId: this.traceId, message };
   }
 
-  warn(message: any, context?: string) {
-    this.logger.warn({ context }, message);
+  log(message: unknown, context?: string) {
+    this.logger.info({ ...this.withTrace(message), context });
   }
 
-  debug(message: any, context?: string) {
-    this.logger.debug({ context }, message);
+  error(message: unknown, trace?: string, context?: string) {
+    this.logger.error({
+      ...this.withTrace(message),
+      trace,
+      context,
+    });
   }
 
-  verbose(message: any, context?: string) {
-    this.logger.trace({ context }, message);
+  warn(message: unknown, context?: string) {
+    this.logger.warn({ ...this.withTrace(message), context });
+  }
+
+  debug(message: unknown, context?: string) {
+    this.logger.debug({ ...this.withTrace(message), context });
+  }
+
+  verbose(message: unknown, context?: string) {
+    this.logger.trace({ ...this.withTrace(message), context });
   }
 }

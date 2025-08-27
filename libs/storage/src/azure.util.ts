@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+
+import { LoggerService } from '@app/logger'; // ← 네 전역 LoggerService
 import {
   BlobSASPermissions,
   BlobServiceClient,
@@ -7,7 +9,6 @@ import {
 } from '@azure/storage-blob';
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs-extra';
-import { LoggerService } from '@app/logger'; // ← 네 전역 LoggerService
 
 const CONN = process.env.AZURE_CONNECTION_STRING!;
 const CONTAINER = process.env.AZURE_CONTAINER ?? 'processed';
