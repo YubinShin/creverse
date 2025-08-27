@@ -1,5 +1,6 @@
 // apps/worker/src/worker.module.ts
 import { AiModule } from '@app/ai';
+import { buildRedis, getQueueName } from '@app/common/redis';
 import { LoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { StorageModule } from '@app/storage';
@@ -10,8 +11,10 @@ import { JobsProcessor } from './jobs.processor';
 
 @Module({
   imports: [
-    BullModule.forRoot({ connection: { host: '127.0.0.1', port: 6379 } }),
-    BullModule.registerQueue({ name: 'jobs' }),
+    BullModule.forRoot({
+      connection: buildRedis(),
+    }),
+    BullModule.registerQueue({ name: getQueueName() }),
     PrismaModule,
     LoggerModule,
     StorageModule,
