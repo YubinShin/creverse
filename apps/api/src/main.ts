@@ -1,8 +1,7 @@
-import { HttpResponseTransformFilter } from '@app/common/filters/http-response-transform.filter';
 import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import type { NextFunction, Request, Response } from 'express';
+import type { Request } from 'express';
 import * as express from 'express';
 import { join } from 'path';
 import pino from 'pino';
@@ -22,14 +21,7 @@ async function bootstrap() {
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-  // traceId 주입
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    req.traceId = req.traceId ?? uuidv4();
-    res.setHeader('x-trace-id', req.traceId);
-    next();
-  });
-
-  // pino-http
+  // 🔥 pino-http 설정
   const rootLogger = pino({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     transport:
@@ -38,10 +30,11 @@ async function bootstrap() {
         : { target: 'pino-pretty', options: { colorize: true } },
     base: undefined,
   });
+
   app.use(
     pinoHttp({
       logger: rootLogger,
-      genReqId: (req) => (req as Request).traceId ?? uuidv4(),
+      genReqId: (req) => (req as Request).traceId ?? uuidv4(), // ✅ 수정
       customProps: (req) => ({ traceId: (req as Request).traceId }),
       customLogLevel: (_req, res, err) =>
         res.statusCode >= 500 || err
@@ -52,7 +45,6 @@ async function bootstrap() {
       autoLogging: true,
     }),
   );
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -61,7 +53,6 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalFilters(new HttpResponseTransformFilter());
 
   app.setGlobalPrefix('api/v1', {
     exclude: [
