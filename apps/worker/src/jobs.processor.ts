@@ -256,7 +256,17 @@ export class JobsProcessor extends WorkerHost {
       height: number;
     },
   ) {
-    const { mp4Url, mp3Url, outMp3, outMp4, ai, log, width, height } = opts;
+    const {
+      mp4Url,
+      mp3Url,
+      outMp3,
+      outMp4,
+      ai,
+      log,
+      width,
+      height,
+      submitText,
+    } = opts;
 
     log.log({ event: 'phase.db-update.start' });
 
@@ -266,10 +276,10 @@ export class JobsProcessor extends WorkerHost {
         data: {
           status: 'COMPLETED',
           score: Math.max(0, Math.min(10, Math.floor(ai.score))),
-          feedback: ai.feedback?.slice(0, 2000) ?? null,
           resultJson: {
             score: ai.score,
-            highlights: ai.highlights,
+            feedback: ai.feedback?.slice(0, 2000) ?? null,
+            highlights: highlightHtmlByStrings(submitText, ai.highlights),
           } as Prisma.InputJsonValue,
           updatedAt: new Date(),
         },

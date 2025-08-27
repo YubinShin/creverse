@@ -32,7 +32,6 @@ model Submission {
   submitText    String   @map("submit_text")
   status        String   @default("PENDING")
   score         Int?
-  feedback      String?
   resultJson    Json?    @map("result_json") // 평가 결과 JSONB
   lastError     String?  @map("last_error")
   createdAt     DateTime @default(now()) @map("created_at")
