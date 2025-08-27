@@ -10,43 +10,46 @@
 
 ```mermaid
 flowchart TD
-    student([Student(웹/앱 사용자)]) --> api[Submission Evaluation API System]
+    student([Student]) --> api[Submission Evaluation API System]
 
     api --> openai[Azure OpenAI]
     api --> blob[Azure Blob Storage]
     api --> alert[Slack/Alert Webhook]
+
 ```
 
 ```mermaid
 flowchart LR
-subgraph system[Submission Evaluation System]
-api[API Server (NestJS)]
-worker[Worker (NestJS)]
-db[(PostgreSQL DB)]
-redis[(Redis - Queue)]
-openai[Azure OpenAI]
-blob[Azure Blob Storage]
-alert[Slack/Alert]
+    subgraph System [Submission Evaluation System]
+        direction TB
 
+        api[API Server - NestJS]
+        worker[Worker - NestJS]
+        db[(PostgreSQL DB)]
+        redis[(Redis Queue)]
+        openai[Azure OpenAI]
+        blob[Azure Blob Storage]
+        alert[Slack/Alert]
+    end
 
-api --> db
-api --> redis
-api --> worker
-worker --> openai
-worker --> blob
-worker --> alert
-end
+    api --> db
+    api --> redis
+    api --> worker
+    worker --> openai
+    worker --> blob
+    worker --> alert
 ```
 
 ```mermaid
 flowchart TD
-subgraph api[API Server (NestJS)]
-auth[Auth Module<br/>JWT Guard]
-students[Students Module<br/>CRUD]
-submissions[Submissions Module<br/>Create/List/Validation]
-publisher[Publisher Module<br/>BullMQ Job]
-logger[Common/Logger<br/>Trace & Logs]
-end
+    subgraph api
+        direction TB
+        auth[Auth Module - JWT Guard]
+        students[Students Module - CRUD]
+        submissions[Submissions Module - Create/List/Validation]
+        publisher[Publisher Module - BullMQ Job]
+        logger[Common/Logger - Trace & Logs]
+    end
 ```
 
 ## Tech Stack
@@ -180,15 +183,60 @@ docker-compose up -d
 - Prisma 기반 DB 접근
 - 로깅 및 추적 (traceId, submission_log 기록)
 
+## Non-Functional Requirements
+
+- 모든 API 응답은 `200 OK` 와 함께 `{ result: "ok" | "failed" }` 형식으로 반환합니다.
+- 실패 시에도 로그를 기록하며 Slack/Alert Webhook 으로 알림을 전송합니다.
+- 모든 요청은 traceId 로 추적됩니다.
+
+## Database Tables
+
+- **students**: 학생 정보 (id, name, createdAt)
+- **submissions**: 제출물 (id, studentId, componentType, status, resultJson, createdAt)
+- **submission_logs**: 제출 처리 로그 (traceId, status, error 등)
+- **submission_media**: 업로드된 미디어 (video/audio URL, mediaType 별 unique)
+- **revisions**: 재평가 이력
+- **stats**: 기간별 집계 정보
+
+## Scheduler
+
+⚠️ 현재 구현되지 않았습니다. 요구사항에 따르면:
+
+- **Auto-Retry Job**: 실패한 제출물을 1시간 주기로 재평가해야 합니다.
+- **Stats Job**: Daily/Weekly/Monthly 주기로 통계를 집계해야 합니다.
+
+향후 BullMQ repeatable jobs를 사용하여 구현할 예정입니다.
+
 ## Testing
 
-```bash
-# Unit Test
-npm run test
+⚠️ 현재 테스트 코드가 충분히 작성되지 않았습니다. 요구사항에 따르면:
 
-# E2E Test
-npm run test:e2e
+- **Unit Test**: 서비스 단위 로직 검증 (예: SubmissionsService, AuthService)
+- **Integration Test**: Prisma + DB, BullMQ 큐 연동 검증
+- **E2E Test**: 실제 API 요청을 통한 end-to-end 흐름 검증
 
-# Coverage
-npm run test:cov
-```
+향후 Jest 및 Testcontainers 기반으로 보강할 예정입니다.
+
+## Available Scripts
+
+- `npm run build` : 전체 앱 빌드
+- `npm run build:api` : API 서버 빌드
+- `npm run build:worker` : Worker 빌드
+- `npm run start:dev api` : API 서버 개발 모드 실행
+- `npm run start:dev worker` : Worker 개발 모드 실행
+- `npm run test` : Jest 단위 테스트 실행
+- `npm run test:e2e` : E2E 테스트 실행
+- `npm run test:cov` : 커버리지 리포트 생성
+- `npm run prisma:migrate` : DB 마이그레이션 실행
+- `npm run seed` : 샘플 데이터 시드
+
+## Lint & Format
+
+- `npm run lint` : ESLint 실행
+- `npm run format` : Prettier를 이용한 코드 자동 포맷팅
+
+## Roadmap / Improvements
+
+- Scheduler (Auto-Retry, Stats Job): 향후 BullMQ repeatable jobs로 구현 예정
+- 테스트 코드: Unit/Integration/E2E를 Jest 및 Testcontainers 기반으로 보강할 예정
+- OpenTelemetry 및 모니터링 연동: 추후 적용 계획
