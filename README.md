@@ -1,108 +1,124 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Creverse Assignment
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+백엔드 과제 프로젝트입니다. NestJS 기반의 모노레포 구조로, API 서버와 Worker 프로세스를 분리하여 구현하였습니다.
 
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 📦 Tech Stack
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- **Backend Framework**: NestJS (monorepo)
+- **Database**: PostgreSQL (Prisma ORM)
+- **Queue**: BullMQ (Redis)
+- **Storage**: Azure Blob Storage
+- **AI**: Azure OpenAI Service
+- **Logger**: Custom Logger + Interceptors
+- **Test**: Jest (Unit & E2E)
 
-## Description
+## 🏗️ Architecture
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+```
+API Server (apps/api)
+ ├─ Auth (JWT 기반)
+ ├─ Students (학생 등록/조회)
+ ├─ Submissions (과제 제출/조회, 큐 발행)
+ └─ Publisher (BullMQ job 발행)
 
-## Project setup
+Worker (apps/worker)
+ ├─ JobsProcessor (BullMQ 소비자)
+ ├─ AI 평가 (libs/ai)
+ ├─ Media 처리 (libs/common/media)
+ └─ Azure Storage 업로드 (libs/storage)
 
-```bash
-$ npm install
+Shared Libraries (libs)
+ ├─ ai        (AI 평가 서비스)
+ ├─ alert     (알림 서비스)
+ ├─ common    (공통 유틸, 미디어 처리, HTTP, config)
+ ├─ logger    (로그 모듈)
+ ├─ prisma    (DB 접근)
+ └─ storage   (Azure Blob Storage 모듈)
 ```
 
-## Compile and run the project
+## 🚀 Getting Started
 
-```bash
-# development
-$ npm run start
+### 1. 환경 변수 설정
 
-# watch mode
-$ npm run start:dev
+루트에 `.env` 파일을 생성합니다. 예시는 `.env.example`를 참고하세요.
 
-# production mode
-$ npm run start:prod
+```env
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Auth
+JWT_SECRET=your-jwt-secret
+ACCESS_CODE=your-access-code
+MAX_RETRY=3
+
+# Alert
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+TRACE_ID=optional-default-trace
+
+# Azure OpenAI
+AZURE_ENDPOINT_URL=https://<your-resource>.openai.azure.com
+AZURE_ENDPOINT_KEY=<your-azure-openai-key>
+AZURE_OPENAI_DEPLOYMENT_NAME=feedback-01
+OPENAPI_API_VERSION=2023-05-15
+
+# Azure Blob Storage
+AZURE_CONNECTION_STRING=DefaultEndpointsProtocol=...;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net
+AZURE_CONTAINER=task
+
+# Queue
+QUEUE_NAME=jobs
 ```
 
-## Run tests
+### 2. 의존성 설치
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it
-runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more
-information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check
-out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment
-straightforward and fast, requiring just a few simple steps:
+### 3. DB 마이그레이션 및 시드
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npx prisma migrate dev
+npx ts-node prisma/seed.ts
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than
-managing infrastructure.
+### 4. 로컬 실행
 
-## Resources
+```bash
+# API 서버 실행
+npm run start:dev api
 
-Check out a few resources that may come in handy when working with NestJS:
+# Worker 실행
+npm run start:dev worker
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time
-  using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our
-  official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework)
-  and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 5. Docker Compose 실행
 
-## Support
+```bash
+docker-compose up -d
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If
-you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## ✅ Features
 
-## Stay in touch
+- 학생 등록 / 조회 API
+- 과제 제출 API (파일 업로드 → Blob 저장 → BullMQ Job 발행)
+- Worker Job 처리 (AI 평가, 영상 Crop, 썸네일 추출, mp3 변환)
+- Prisma 기반 DB 접근
+- 로깅 및 추적 (traceId, submission_log 기록)
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## 🧪 Testing
 
-## License
+```bash
+# Unit Test
+npm run test
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# E2E Test
+npm run test:e2e
+
+# Coverage
+npm run test:cov
+```
