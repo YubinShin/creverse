@@ -1,5 +1,5 @@
 import { LoggerService } from '@app/logger';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export type AlertChannel = 'slack' | 'discord' | 'generic';

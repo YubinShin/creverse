@@ -6,9 +6,9 @@ import { StorageModule } from '@app/storage';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AlertModule } from 'libs/alert';
 
 import { JobsProcessor } from './jobs.processor';
-import { AlertModule } from 'libs/alert';
 
 @Module({
   imports: [

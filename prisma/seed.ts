@@ -1,7 +1,7 @@
 /* prisma/seed.ts */
-import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
 
+import { PrismaClient } from '@prisma/client';
 import { sign } from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
@@ -74,14 +74,21 @@ async function main() {
   );
 
   // 4) 콘솔 출력
+  console.log('----------------------------------------');
+  console.log(' SEED COMPLETE ');
+  console.log('----------------------------------------');
 
-  console.log('✅ Seed complete.');
+  console.table({
+    Students: { alice: alice.id, bob: bob.id },
+  });
 
-  console.log('Students:', { alice: alice.id, bob: bob.id });
+  console.table({
+    Submissions: { s1: s1.id, s2: s2.id },
+  });
 
-  console.log('Submissions:', { s1: s1.id, s2: s2.id });
-
-  console.log('Demo JWT:', token);
+  console.log('Demo JWT:');
+  console.log(token);
+  console.log('----------------------------------------');
 }
 
 main()
@@ -89,6 +96,6 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    void prisma.$disconnect();
   });

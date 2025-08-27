@@ -1,5 +1,6 @@
-import { safeToString } from '@app/common';
 import * as path from 'node:path';
+
+import { safeToString } from '@app/common';
 
 export const normalize = (p: string): string => p.replace(/^\/+/, '');
 
