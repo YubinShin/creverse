@@ -1,5 +1,6 @@
+import { LoggerService } from '@app/logger';
 import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AxiosResponse } from 'axios';
 import { catchError, lastValueFrom, map, tap } from 'rxjs';
 
@@ -7,7 +8,7 @@ import { catchError, lastValueFrom, map, tap } from 'rxjs';
 export class LoggedHttpService {
   constructor(
     private readonly http: HttpService,
-    private readonly logger: Logger, // 여기서 주입
+    private readonly logger: LoggerService,
   ) {}
 
   async postWithLog<T = unknown>(

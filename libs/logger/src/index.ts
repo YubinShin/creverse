@@ -1,2 +1,2 @@
 export * from './logger.module';
-export * from './pino-logger.provider';
+export * from './logger.service';

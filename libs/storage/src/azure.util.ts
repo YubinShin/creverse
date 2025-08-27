@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-
 import {
   BlobSASPermissions,
   BlobServiceClient,
@@ -8,7 +7,7 @@ import {
 } from '@azure/storage-blob';
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs-extra';
-import { LoggedHttpService } from '@app/common/http/logged-http.service';
+import { LoggerService } from '@app/logger'; // ← 네 전역 LoggerService
 
 const CONN = process.env.AZURE_CONNECTION_STRING!;
 const CONTAINER = process.env.AZURE_CONTAINER ?? 'processed';
@@ -38,7 +37,7 @@ function explainAzureError(e: any) {
 
 @Injectable()
 export class AzureStorage {
-  constructor(private readonly httpLogger: LoggedHttpService) {}
+  constructor(private readonly logger: LoggerService) {}
 
   private readonly container = client.getContainerClient(CONTAINER);
 
@@ -54,23 +53,30 @@ export class AzureStorage {
   ): Promise<string> {
     const bp = normalize(blobPath);
 
-    console.log('[azure] accountUrl =', client.url);
-    console.log('[azure] container =', this.container.containerName);
-    console.log('[azure] blobPath =', bp);
+    this.logger.debug(
+      `[azure] accountUrl=${client.url} container=${this.container.containerName} blobPath=${bp}`,
+      'AzureStorage',
+    );
 
     try {
       const created = await this.container.createIfNotExists();
-      console.log('[azure] createIfNotExists:', created.succeeded);
+      this.logger.debug(
+        `[azure] createIfNotExists=${created.succeeded}`,
+        'AzureStorage',
+      );
     } catch (e) {
-      console.error('[azure] createIfNotExists failed:', explainAzureError(e));
+      this.logger.error(
+        `[azure] createIfNotExists failed: ${explainAzureError(e)}`,
+        e.stack,
+        'AzureStorage',
+      );
       throw e;
     }
 
     const exists = await this.container.exists();
-    console.log('[azure] container.exists():', exists);
+    this.logger.debug(`[azure] container.exists()=${exists}`, 'AzureStorage');
 
     const blob = this.container.getBlockBlobClient(bp);
-    console.log('[azure] blockBlob =', blob.url);
 
     // 로컬 파일 확인
     const stat = await fs.stat(localPath).catch(() => null);
@@ -86,26 +92,29 @@ export class AzureStorage {
         },
       });
 
-      this.httpLogger.log({
-        traceId,
-        action: 'azure_upload',
-        path: bp,
-        status: 'ok',
-        latency: Date.now() - start,
-      });
-
-      console.log('[azure] uploadFile OK');
+      this.logger.log(
+        {
+          traceId,
+          action: 'azure_upload',
+          path: bp,
+          status: 'ok',
+          latency: Date.now() - start,
+        },
+        'AzureStorage',
+      );
     } catch (e) {
-      this.httpLogger.error({
-        traceId,
-        action: 'azure_upload',
-        path: bp,
-        status: 'failed',
-        latency: Date.now() - start,
-        message: explainAzureError(e),
-      });
-
-      console.error('[azure] uploadFile failed:', explainAzureError(e));
+      this.logger.error(
+        {
+          traceId,
+          action: 'azure_upload',
+          path: bp,
+          status: 'failed',
+          latency: Date.now() - start,
+          message: explainAzureError(e),
+        },
+        e.stack,
+        'AzureStorage',
+      );
       throw e;
     }
 
@@ -121,7 +130,7 @@ export class AzureStorage {
     const startsOn = new Date(Date.now() - 5 * 60_000);
     const expiresOn = new Date(Date.now() + ttlMinutes * 60_000);
 
-    const cred = (client as any).credential; // conn-string 경로면 내부에 이미 credential 있음
+    const cred = (client as any).credential;
 
     const sas = generateBlobSASQueryParameters(
       {
