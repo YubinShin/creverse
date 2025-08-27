@@ -242,11 +242,7 @@ npm run start:dev api
 npm run start:dev worker
 ```
 
-### 5. Docker Compose 실행
 
-```bash
-docker-compose up -d
-```
 
 ## Features
 
