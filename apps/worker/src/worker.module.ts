@@ -8,6 +8,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { JobsProcessor } from './jobs.processor';
+import { AlertModule } from 'libs/alert';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { JobsProcessor } from './jobs.processor';
     LoggerModule,
     StorageModule,
     AiModule,
+    AlertModule,
   ],
   providers: [JobsProcessor],
 })

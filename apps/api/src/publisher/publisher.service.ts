@@ -1,3 +1,4 @@
+import { LoggerService } from '@app/logger';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,13 +12,17 @@ export class PublisherService {
   private readonly queueName: string;
 
   constructor(
+    private readonly logger: LoggerService,
     private readonly config: ConfigService,
     @InjectQueue() private readonly q: Queue<JobData>, // 여기선 default 등록된 queue 받음
   ) {
     this.queueName = this.config.get<string>('queue.name') ?? 'jobs';
     this.q.on('error', (e: unknown) => {
       const err = e as Error;
-      console.error(`[Publisher queue error][${this.queueName}]`, err.message);
+      this.logger.error(
+        `[Publisher queue error][${this.queueName}]`,
+        err.message,
+      );
     });
   }
 

@@ -45,15 +45,6 @@ export async function detectLeftBoundaryX(
 
   const smoothed = smooth(accum, 5); // kernelSize = 5
 
-  console.log(
-    'smoothed max/min/avg:',
-    Math.max(...smoothed),
-    Math.min(...smoothed),
-    smoothed.reduce((a, b) => a + b, 0) / smoothed.length,
-  );
-
-  console.log(smoothed.map((x) => x.toFixed(1).padStart(4)).join('|'));
-
   // Scan from right to left
   let run = 0;
   for (let x = W - 1; x >= 0; x--) {
@@ -63,7 +54,6 @@ export async function detectLeftBoundaryX(
         const xEnd = x + minRun - 1;
         const xRatio = xEnd / W;
         const detectedX = Math.floor(width * xRatio);
-        console.log('🏁 final detectedX:', detectedX, 'run count=', run);
         return { x: Math.max(0, detectedX), debugFramePath };
       }
     } else {

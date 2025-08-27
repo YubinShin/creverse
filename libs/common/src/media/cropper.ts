@@ -21,7 +21,6 @@ export async function cropVideo(
       .videoFilter(`crop=${w}:${h}:${x}:${y}`)
       .noAudio()
       .outputOptions(['-y'])
-      .on('start', (cmd) => console.log('[FFmpeg cmd]', cmd))
       .on('end', () => resolve())
       .on('error', (e) => reject(e instanceof Error ? e : new Error(String(e))))
       .save(outputPath);

@@ -10,6 +10,7 @@ import { AzureStorageService } from '@app/storage/azure-storage.service';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
+import { AlertService } from 'libs/alert';
 
 type ProcessJob = { submissionId: number; traceId?: string; filePath?: string };
 
@@ -20,6 +21,7 @@ export class JobsProcessor extends WorkerHost {
     private readonly storage: AzureStorageService,
     private readonly ai: AiService,
     private readonly logger: LoggerService,
+    private readonly alert: AlertService,
   ) {
     super();
   }
@@ -81,6 +83,10 @@ export class JobsProcessor extends WorkerHost {
       });
 
       log.error({ event: 'job.failed', msg: err.message, stack: err.stack });
+      await this.alert.notifyOnFailure(`job.failed: ${err.message}`, {
+        traceId: job.id,
+        extras: { submissionId },
+      });
       throw err;
     } finally {
       await this.prisma.submissionLog.create({
