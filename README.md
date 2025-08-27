@@ -6,9 +6,11 @@
 ### Extracted Medias
 
 <img width="304" height="181" alt="스크린샷 2025-08-27 오후 8 21 14" src="https://github.com/user-attachments/assets/81b7f62e-58d6-4a29-b2bf-6205b249086c" />
+
+<br/>
+<img width="317" height="188" alt="스크린샷 2025-08-27 오후 8 27 26" src="https://github.com/user-attachments/assets/bf67c4ac-8579-40a0-a1d5-066b9c41c2c0" />
 <br/>
 <img width="312" height="181" alt="스크린샷 2025-08-27 오후 8 21 32" src="https://github.com/user-attachments/assets/d5350b57-e000-4597-bc62-3e3f3ddc4e5d" />
-
 
 ### Submissions
 <table border="1" style="border-collapse:collapse">
@@ -269,24 +271,7 @@ docker-compose up -d
 - **revisions**: 재평가 이력
 - **stats**: 기간별 집계 정보
 
-## Scheduler
 
-⚠️ 현재 구현되지 않았습니다. 요구사항에 따르면:
-
-- **Auto-Retry Job**: 실패한 제출물을 1시간 주기로 재평가해야 합니다.
-- **Stats Job**: Daily/Weekly/Monthly 주기로 통계를 집계해야 합니다.
-
-향후 BullMQ repeatable jobs를 사용하여 구현할 예정입니다.
-
-## Testing
-
-⚠️ 현재 테스트 코드가 충분히 작성되지 않았습니다. 요구사항에 따르면:
-
-- **Unit Test**: 서비스 단위 로직 검증 (예: SubmissionsService, AuthService)
-- **Integration Test**: Prisma + DB, BullMQ 큐 연동 검증
-- **E2E Test**: 실제 API 요청을 통한 end-to-end 흐름 검증
-
-향후 Jest 및 Testcontainers 기반으로 보강할 예정입니다.
 
 ## Available Scripts
 
@@ -305,6 +290,25 @@ docker-compose up -d
 
 - `npm run lint` : ESLint 실행
 - `npm run format` : Prettier를 이용한 코드 자동 포맷팅
+
+## Scheduler
+
+⚠️ 현재 구현되지 않았습니다. 요구사항에 따르면:
+
+- **Auto-Retry Job**: 실패한 제출물을 1시간 주기로 재평가해야 합니다.
+- **Stats Job**: Daily/Weekly/Monthly 주기로 통계를 집계해야 합니다.
+
+향후 BullMQ repeatable jobs를 사용하여 구현할 예정입니다.
+
+## Testing
+
+⚠️ 현재 테스트 코드가 충분히 작성되지 않았습니다. 요구사항에 따르면:
+
+- **Unit Test**: 서비스 단위 로직 검증 (예: SubmissionsService, AuthService)
+- **Integration Test**: Prisma + DB, BullMQ 큐 연동 검증
+- **E2E Test**: 실제 API 요청을 통한 end-to-end 흐름 검증
+
+향후 Jest 및 Testcontainers 기반으로 보강할 예정입니다.
 
 ## Roadmap / Improvements
 
