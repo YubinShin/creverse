@@ -69,6 +69,7 @@ export class SubmissionsController {
     const saved = await this.svc.create(dto, file?.path, traceId);
     return { result: 'ok', message: null, data: { submissionId: saved.id } };
   }
+
   @Get()
   async list(@Query() q: ListQueryDto) {
     const data = await this.svc.list(q);

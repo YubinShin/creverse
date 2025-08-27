@@ -13,19 +13,45 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": "./",
     "paths": {
-      "@app/common": ["libs/common/src"],
-      "@app/common/*": ["libs/common/src/*"],
-      "@prisma/client": ["prisma/generated"],
-      "@utils": ["src/common/utils/index.ts"],
-      "@utils/*": ["src/common/utils/*"],
-      "@app/ai": ["libs/ai/src"],
-      "@app/ai/*": ["libs/ai/src/*"],
-      "@app/prisma": ["libs/prisma/src"],
-      "@app/prisma/*": ["libs/prisma/src/*"],
-      "@app/logger": ["libs/logger/src"],
-      "@app/logger/*": ["libs/logger/src/*"],
-      "@app/storage": ["libs/storage/src"],
-      "@app/storage/*": ["libs/storage/src/*"]
+      "@app/common": [
+        "libs/common/src"
+      ],
+      "@app/common/*": [
+        "libs/common/src/*"
+      ],
+      "@prisma/client": [
+        "prisma/generated"
+      ],
+      "@utils": [
+        "src/common/utils/index.ts"
+      ],
+      "@utils/*": [
+        "src/common/utils/*"
+      ],
+      "@app/ai": [
+        "libs/ai/src"
+      ],
+      "@app/ai/*": [
+        "libs/ai/src/*"
+      ],
+      "@app/prisma": [
+        "libs/prisma/src"
+      ],
+      "@app/prisma/*": [
+        "libs/prisma/src/*"
+      ],
+      "@app/logger": [
+        "libs/logger/src"
+      ],
+      "@app/logger/*": [
+        "libs/logger/src/*"
+      ],
+      "@app/storage": [
+        "libs/storage/src"
+      ],
+      "@app/storage/*": [
+        "libs/storage/src/*"
+      ]
       // "@prisma": ["prisma/client"]
     },
     "skipLibCheck": true,
@@ -35,6 +61,9 @@
     "strictNullChecks": true,
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node", "jest"]
+    "types": [
+      "node",
+      "jest"
+    ]
   }
 }

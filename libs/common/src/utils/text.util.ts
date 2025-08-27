@@ -55,6 +55,7 @@ export function safeParseJson<T>(
     return { ok: false as const };
   }
 }
+
 export function safeToString(v: unknown): string {
   if (
     typeof v === 'string' ||

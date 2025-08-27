@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { Request } from 'express';
 
-import { JobData, ProcessJob, ReevalJob } from './types/publisher.types';
+import { JobData, ProcessJob } from './types/publisher.types';
 
 @Injectable()
 export class PublisherService {

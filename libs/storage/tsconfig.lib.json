@@ -4,5 +4,7 @@
     "declaration": true,
     "outDir": "../../dist/libs/storage"
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ]
 }

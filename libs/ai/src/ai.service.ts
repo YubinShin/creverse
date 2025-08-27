@@ -7,8 +7,6 @@ import { AiEvalResult } from './types/ai-eval-result.type';
 
 @Injectable()
 export class AiService {
-  constructor(private readonly loggedHttp: LoggedHttpService) {}
-
   private readonly apiVersion = process.env.OPENAPI_API_VERSION ?? '2023-05-15';
   private readonly endpoint = process.env.AZURE_ENDPOINT_URL!.replace(
     /\/+$/,
@@ -17,6 +15,8 @@ export class AiService {
   private readonly deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME!;
   private readonly key = process.env.AZURE_ENDPOINT_KEY!;
   private readonly logger = new Logger(AiService.name);
+
+  constructor(private readonly loggedHttp: LoggedHttpService) {}
 
   async evaluate(params: {
     submitText: string;

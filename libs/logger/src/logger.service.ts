@@ -21,16 +21,6 @@ export class LoggerService implements NestLoggerService {
     this.traceId = traceId;
   }
 
-  private withTrace(message: unknown): Record<string, unknown> {
-    if (typeof message === 'string') {
-      return { traceId: this.traceId, message };
-    }
-    if (typeof message === 'object' && message !== null) {
-      return { traceId: this.traceId, ...(message as Record<string, unknown>) };
-    }
-    return { traceId: this.traceId, message };
-  }
-
   log(message: unknown, context?: string) {
     this.logger.info({ ...this.withTrace(message), context });
   }
@@ -63,5 +53,15 @@ export class LoggerService implements NestLoggerService {
     childService.logger = this.logger.child(bindings);
     childService.setTraceId(this.traceId ?? '');
     return childService;
+  }
+
+  private withTrace(message: unknown): Record<string, unknown> {
+    if (typeof message === 'string') {
+      return { traceId: this.traceId, message };
+    }
+    if (typeof message === 'object' && message !== null) {
+      return { traceId: this.traceId, ...(message as Record<string, unknown>) };
+    }
+    return { traceId: this.traceId, message };
   }
 }
