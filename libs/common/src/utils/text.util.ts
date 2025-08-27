@@ -78,3 +78,17 @@ export function safeParseJson<T>(
     return { ok: false as const };
   }
 }
+export function safeToString(v: unknown): string {
+  if (
+    typeof v === 'string' ||
+    typeof v === 'number' ||
+    typeof v === 'boolean'
+  ) {
+    return String(v);
+  }
+  if (v instanceof Error) {
+    return v.message;
+  }
+  if (v) return JSON.stringify(v);
+  return '-';
+}

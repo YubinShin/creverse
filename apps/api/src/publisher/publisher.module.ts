@@ -1,10 +1,18 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
 import { PublisherService } from './publisher.service';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  imports: [
+    BullModule.registerQueueAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        name: config.get<string>('queue.name') ?? 'jobs',
+      }),
+    }),
+  ],
   providers: [PublisherService],
   exports: [PublisherService],
 })

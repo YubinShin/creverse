@@ -1,50 +1,32 @@
-import * as path from 'node:path';
-
-import { LoggerService } from '@app/logger'; // ← 네 전역 LoggerService
+import { LoggerService } from '@app/logger';
 import {
   BlobSASPermissions,
   BlobServiceClient,
   generateBlobSASQueryParameters,
   SASProtocol,
+  StorageSharedKeyCredential,
 } from '@azure/storage-blob';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs-extra';
 
-const CONN = process.env.AZURE_CONNECTION_STRING!;
-const CONTAINER = process.env.AZURE_CONTAINER ?? 'processed';
-
-// 클라이언트 단일 생성
-const client = BlobServiceClient.fromConnectionString(CONN);
-const normalize = (p: string) => p.replace(/^\/+/, '');
-
-// 확장자 기반 content-type 추정
-function guessType(p: string): string {
-  const ext = path.extname(p).toLowerCase();
-  if (ext === '.mp4') return 'video/mp4';
-  if (ext === '.mp3') return 'audio/mpeg';
-  if (ext === '.wav') return 'audio/wav';
-  if (ext === '.aac') return 'audio/aac';
-  if (ext === '.m4a') return 'audio/mp4';
-  if (ext === '.json') return 'application/json; charset=utf-8';
-  if (ext === '.txt') return 'text/plain; charset=utf-8';
-  return 'application/octet-stream';
-}
-
-function explainAzureError(e: any) {
-  const status = e?.statusCode ?? e?.status;
-  const code = e?.details?.errorCode ?? e?.code;
-  return `status=${status} code=${code} msg=${e?.message ?? e}`;
-}
+import { explainAzureError, guessType, normalize } from './utils/storage.utils';
 
 @Injectable()
 export class AzureStorage {
-  constructor(private readonly logger: LoggerService) {}
+  private readonly containerClient;
 
-  private readonly container = client.getContainerClient(CONTAINER);
+  constructor(
+    private readonly logger: LoggerService,
+    private readonly config: ConfigService,
+  ) {
+    const conn = this.config.getOrThrow<string>('storage.connectionString');
+    const container = this.config.getOrThrow<string>('storage.container');
 
-  /**
-   * 로컬 파일 업로드 후 읽기 전용 SAS URL 반환
-   */
+    const client = BlobServiceClient.fromConnectionString(conn);
+    this.containerClient = client.getContainerClient(container);
+  }
+
   async uploadFileAndGetSas(
     blobPath: string,
     localPath: string,
@@ -54,30 +36,26 @@ export class AzureStorage {
   ): Promise<string> {
     const bp = normalize(blobPath);
 
-    this.logger.debug(
-      `[azure] accountUrl=${client.url} container=${this.container.containerName} blobPath=${bp}`,
-      'AzureStorage',
-    );
-
     try {
-      const created = await this.container.createIfNotExists();
+      const created = await this.containerClient.createIfNotExists();
       this.logger.debug(
         `[azure] createIfNotExists=${created.succeeded}`,
         'AzureStorage',
       );
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as Error;
       this.logger.error(
-        `[azure] createIfNotExists failed: ${explainAzureError(e)}`,
-        e.stack,
+        `[azure] createIfNotExists failed: ${explainAzureError(err)}`,
+        err.stack,
         'AzureStorage',
       );
-      throw e;
+      throw err;
     }
 
-    const exists = await this.container.exists();
+    const exists = await this.containerClient.exists();
     this.logger.debug(`[azure] container.exists()=${exists}`, 'AzureStorage');
 
-    const blob = this.container.getBlockBlobClient(bp);
+    const blob = this.containerClient.getBlockBlobClient(bp);
 
     // 로컬 파일 확인
     const stat = await fs.stat(localPath).catch(() => null);
@@ -103,7 +81,8 @@ export class AzureStorage {
         },
         'AzureStorage',
       );
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as Error;
       this.logger.error(
         {
           traceId,
@@ -111,31 +90,31 @@ export class AzureStorage {
           path: bp,
           status: 'failed',
           latency: Date.now() - start,
-          message: explainAzureError(e),
+          message: explainAzureError(err),
         },
-        e.stack,
+        err.stack,
         'AzureStorage',
       );
-      throw e;
+      throw err;
     }
 
-    // SAS URL 발급
     return this.getSasUrl(bp, ttlMinutes, blob.url);
   }
 
-  /**
-   * 읽기 전용 SAS URL 생성
-   */
   getSasUrl(blobPath: string, ttlMinutes = 60, baseUrl?: string): string {
     const bp = normalize(blobPath);
     const startsOn = new Date(Date.now() - 5 * 60_000);
     const expiresOn = new Date(Date.now() + ttlMinutes * 60_000);
 
-    const cred = (client as any).credential;
+    const client = this.containerClient;
+    const cred = (
+      client as unknown as { credential?: StorageSharedKeyCredential }
+    ).credential;
+    if (!cred) throw new Error('Storage client credential is missing');
 
     const sas = generateBlobSASQueryParameters(
       {
-        containerName: this.container.containerName,
+        containerName: this.containerClient.containerName,
         blobName: bp,
         permissions: BlobSASPermissions.parse('r'),
         protocol: SASProtocol.Https,
@@ -145,7 +124,8 @@ export class AzureStorage {
       cred,
     ).toString();
 
-    const url = baseUrl ?? `${client.url}${this.container.containerName}/${bp}`;
+    const url =
+      baseUrl ?? `${client.url}${this.containerClient.containerName}/${bp}`;
     return `${url}?${sas}`;
   }
 }

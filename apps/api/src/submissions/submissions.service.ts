@@ -62,7 +62,7 @@ export class SubmissionsService {
 
     // 2) 큐 발행 시도
     try {
-      await this.publisher.enqueueProcess({
+      await this.publisher.enqueueProcessJob({
         submissionId: submission.id,
         traceId,
         filePath,

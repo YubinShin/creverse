@@ -1,19 +1,23 @@
-import { buildRedis, getQueueName } from '@app/common/redis/redis.config';
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { Request } from 'express';
 
 import { JobData, ProcessJob, ReevalJob } from './types/publisher.types';
 
 @Injectable()
-export class PublisherService implements OnModuleDestroy {
-  private readonly q: Queue<JobData>;
+export class PublisherService {
+  private readonly queueName: string;
 
-  constructor() {
-    this.q = new Queue<JobData>(getQueueName(), { connection: buildRedis() });
+  constructor(
+    private readonly config: ConfigService,
+    @InjectQueue() private readonly q: Queue<JobData>, // 여기선 default 등록된 queue 받음
+  ) {
+    this.queueName = this.config.get<string>('queue.name') ?? 'jobs';
     this.q.on('error', (e: unknown) => {
       const err = e as Error;
-      console.error('[Publisher queue error]', err.message, err.stack);
+      console.error(`[Publisher queue error][${this.queueName}]`, err.message);
     });
   }
 
@@ -25,25 +29,30 @@ export class PublisherService implements OnModuleDestroy {
     const traceId = req.traceId;
     await this.q.add(
       'process-job',
-      { submissionId, filePath, traceId } as ProcessJob,
+      { submissionId, filePath, traceId },
+      { removeOnComplete: 50, removeOnFail: 100 },
+    );
+    return { status: 'queued', submissionId, traceId, queue: this.queueName };
+  }
+
+  async publishReevalJob(req: Request, submissionId: number) {
+    const traceId = req.traceId;
+    await this.q.add(
+      'reeval-job',
+      { submissionId, traceId },
       {
         removeOnComplete: 50,
         removeOnFail: 100,
       },
     );
-    return { status: 'queued', submissionId, traceId };
+    return { status: 'queued', submissionId, traceId, queue: this.queueName };
   }
 
-  async publishReevalJob(req: Request, submissionId: number) {
-    const traceId = req.traceId;
-    await this.q.add('reeval-job', { submissionId, traceId } as ReevalJob, {
+  public async enqueueProcessJob(data: ProcessJob, traceId?: string) {
+    await this.q.add('process-job', data, {
       removeOnComplete: 50,
       removeOnFail: 100,
     });
-    return { status: 'queued', submissionId, traceId };
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.q.close();
+    return { status: 'queued', traceId, submissionId: data.submissionId };
   }
 }

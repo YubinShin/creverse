@@ -1,9 +1,9 @@
+import { AppConfigModule } from '@app/common/infra';
 import { HttpResponseTransformFilter } from '@app/common/infra/filters';
 import { TraceInterceptor } from '@app/common/infra/interceptors';
 import { LoggerModule } from '@app/logger';
 import { PrismaModule } from '@app/prisma';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AuthController } from './auth/auth.controller';
@@ -14,7 +14,7 @@ import { SubmissionsModule } from './submissions/submissions.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    AppConfigModule,
     PrismaModule,
     AuthModule,
     StudentsModule,
