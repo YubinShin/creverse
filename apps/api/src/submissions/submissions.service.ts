@@ -106,7 +106,7 @@ export class SubmissionsService {
         }),
         this.prisma.submission.update({
           where: { id: submission.id },
-          data: { status: 'FAILED', lastError: message }, // lastError는 스키마에서 제거했으므로 삭제
+          data: { status: 'FAILED', lastError: message },
         }),
       ]);
 

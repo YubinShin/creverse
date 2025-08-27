@@ -1,37 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the `http_log` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `revision` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `student` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `submission` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `submission_log` table. If the table is not empty, all the data it contains will be lost.
-
-*/
--- DropForeignKey
-ALTER TABLE "public"."revision" DROP CONSTRAINT "revision_submission_id_fkey";
-
--- DropForeignKey
-ALTER TABLE "public"."submission" DROP CONSTRAINT "submission_student_id_fkey";
-
--- DropForeignKey
-ALTER TABLE "public"."submission_log" DROP CONSTRAINT "submission_log_submission_id_fkey";
-
--- DropTable
-DROP TABLE "public"."http_log";
-
--- DropTable
-DROP TABLE "public"."revision";
-
--- DropTable
-DROP TABLE "public"."student";
-
--- DropTable
-DROP TABLE "public"."submission";
-
--- DropTable
-DROP TABLE "public"."submission_log";
-
 -- CreateTable
 CREATE TABLE "public"."students" (
     "id" SERIAL NOT NULL,
@@ -51,6 +17,7 @@ CREATE TABLE "public"."submissions" (
     "score" INTEGER,
     "feedback" TEXT,
     "result_json" JSONB,
+    "last_error" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -62,7 +29,8 @@ CREATE TABLE "public"."submission_media" (
     "id" SERIAL NOT NULL,
     "submission_id" INTEGER NOT NULL,
     "media_type" TEXT NOT NULL,
-    "uri" TEXT NOT NULL,
+    "local_path" TEXT,
+    "blob_url" TEXT,
     "metadata" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -74,6 +42,7 @@ CREATE TABLE "public"."submission_logs" (
     "id" SERIAL NOT NULL,
     "submission_id" INTEGER NOT NULL,
     "phase" TEXT NOT NULL,
+    "uri" TEXT,
     "status" TEXT NOT NULL,
     "trace_id" TEXT,
     "latency_ms" INTEGER,
@@ -134,6 +103,9 @@ CREATE TABLE "public"."stats_monthly" (
 
     CONSTRAINT "stats_monthly_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "submission_media_submission_id_media_type_key" ON "public"."submission_media"("submission_id", "media_type");
 
 -- AddForeignKey
 ALTER TABLE "public"."submissions" ADD CONSTRAINT "submissions_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "public"."students"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
