@@ -2,9 +2,80 @@
 
 백엔드 과제 프로젝트입니다. NestJS 기반의 모노레포 구조로, API 서버와 Worker 프로세스를 분리하여 구현하였습니다.
 
+## Results
+### Extracted Medias
+
+<img width="304" height="181" alt="스크린샷 2025-08-27 오후 8 21 14" src="https://github.com/user-attachments/assets/81b7f62e-58d6-4a29-b2bf-6205b249086c" />
+<br/>
+<img width="312" height="181" alt="스크린샷 2025-08-27 오후 8 21 32" src="https://github.com/user-attachments/assets/d5350b57-e000-4597-bc62-3e3f3ddc4e5d" />
+
+
+### Submissions
+<table border="1" style="border-collapse:collapse">
+<tr>
+  <th>id</th>
+  <th>student_id</th>
+  <th>component_type</th>
+  <th>submit_text</th>
+  <th>status</th>
+  <th>score</th>
+  <th>result_json</th>
+</tr>
+<tr>
+  <td>8</td>
+  <td>1</td>
+  <td>Essay</td>
+  <td>Although technology makes our lives easier, it also brings challenges such as privacy issues and social isolation. Therefore, we must learn to use technology wisely.</td>
+  <td>COMPLETED</td>
+  <td>8</td>
+  <td>{"score": 8, "feedback": "이 에세이는 기술의 장점과 단점을 간결하게 설명하고 있습니다. 그러나 더 깊이 있는 분석이나 구체적인 예시가 부족합니다.", "highlights": "Although technology makes our lives easier, it also brings challenges such as <b>privacy issues</b> and <b>social isolation</b>. Therefore, we must learn to <b>use technology wisely</b>."}</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>1</td>
+  <td>Essay</td>
+  <td>My favorite hobby is reading books. Sometimes I read novels, other times I enjoy history. Reading helps me learn new words and improve my imagination.</td>
+  <td>COMPLETED</td>
+  <td>7</td>
+  <td>{"score": 7, "feedback": "학생의 에세이는 간결하고 명확하게 취미에 대한 설명을 제공하고 있습니다. 그러나 문장 구조가 단순하여 깊이 있는 분석이나 개인적인 경험이 부족합니다.", "highlights": "My favorite hobby is reading books. <b>Sometimes I read novels</b>, <b>other times I enjoy history</b>. <b>Reading helps me learn new words</b> and improve my imagination."}</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>1</td>
+  <td>Essay</td>
+  <td>Yesterday I go to the park with my friend. We play soccer and it was very fun. I am enjoy the fresh air and the trees.</td>
+  <td>COMPLETED</td>
+  <td>5</td>
+  <td>{"score": 5, "feedback": "문법적 오류가 여러 곳에 있으며, 시제 일관성이 부족합니다. 문장을 더 자연스럽게 개선할 필요가 있습니다.", "highlights": "Yesterday I <b>go</b> to the park with my friend. We <b>play</b> soccer and it was very fun. I <b>am enjoy</b> the fresh air and the trees."}</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>1</td>
+  <td>Essay</td>
+  <td>I like pizza. I like school. I like my teacher.</td>
+  <td>COMPLETED</td>
+  <td>2</td>
+  <td>{"score": 2, "feedback": "에세이가 매우 짧고, 주제에 대한 깊이 있는 설명이 부족합니다. 문장 구조가 단순하며, 연결성이 부족합니다.", "highlights": "<b>I like pizza.</b> <b>I like school.</b> <b>I like my teacher.</b>"}</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td>1</td>
+  <td>Essay</td>
+  <td>I don't know.</td>
+  <td>COMPLETED</td>
+  <td>1</td>
+  <td>{"score": 1, "feedback": "에세이가 너무 짧고 주제에 대한 논의가 전혀 없습니다. 더 많은 내용을 추가하고 주제를 깊이 있게 탐구해야 합니다.", "highlights": "I don't know."}</td>
+</tr>
+</table>
+
+
+
+
 ## ERD
 
-<img width="1975" height="1867" alt="creverse_erd" src="https://github.com/user-attachments/assets/3665e036-11cf-436b-9d35-4efcdaeb1155" />
+<img width="2190" height="1828" alt="creverse" src="https://github.com/user-attachments/assets/e71f5fe6-ce70-4d70-b1b3-31cfb71e2cce" />
+
+
 
 ## Diagram
 
