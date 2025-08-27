@@ -1,3 +1,2 @@
-export * from './azure.util';
+export * from './azure-storage.service';
 export * from './storage.module';
-export * from './storage.service';

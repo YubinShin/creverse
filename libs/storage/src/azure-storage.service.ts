@@ -13,7 +13,7 @@ import * as fs from 'fs-extra';
 import { explainAzureError, guessType, normalize } from './utils/storage.utils';
 
 @Injectable()
-export class AzureStorage {
+export class AzureStorageService {
   private readonly containerClient;
 
   constructor(

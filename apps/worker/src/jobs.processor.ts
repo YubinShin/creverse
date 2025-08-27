@@ -6,7 +6,7 @@ import { extractMp3 } from '@app/common/media/mp3-extractor';
 import { getVideoSizeFast } from '@app/common/media/video-meta';
 import { LoggerService } from '@app/logger';
 import { PrismaService } from '@app/prisma';
-import { AzureStorage } from '@app/storage';
+import { AzureStorageService } from '@app/storage/azure-storage.service';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
@@ -17,7 +17,7 @@ type ProcessJob = { submissionId: number; traceId?: string; filePath?: string };
 export class JobsProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: AzureStorage,
+    private readonly storage: AzureStorageService,
     private readonly ai: AiService,
     private readonly logger: LoggerService,
   ) {
