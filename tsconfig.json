@@ -3,10 +3,5 @@
   "compilerOptions": {
     "outDir": "./dist"
   },
-  "include": [
-    "apps",
-    "libs",
-    "src",
-    "prisma"
-  ]
+  "include": ["apps", "libs", "src", "test", "prisma"]
 }

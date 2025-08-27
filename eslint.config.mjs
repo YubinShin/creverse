@@ -11,7 +11,7 @@ import simpleImportSortPlugin from 'eslint-plugin-simple-import-sort';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'dist', 'node_modules'],
+    ignores: ['eslint.config.mjs', 'dist', 'node_modules,jest.config.js'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -39,7 +39,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-
+      '@typescript-eslint/unbound-method': 'off',
       'import/no-unresolved': ['error', { caseSensitive: true }],
       'import/no-duplicates': 'warn',
 

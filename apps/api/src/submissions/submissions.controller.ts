@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -64,9 +65,9 @@ export class SubmissionsController {
   async create(
     @Body() dto: CreateSubmissionDto,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @HeadersDec('x-trace-id') traceId?: string,
+    @Req() req: Request & { traceId?: string },
   ) {
-    const saved = await this.svc.create(dto, file?.path, traceId);
+    const saved = await this.svc.create(dto, file?.path, req.traceId);
     return { result: 'ok', message: null, data: { submissionId: saved.id } };
   }
 

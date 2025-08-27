@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-// import { Prisma } from '@prisma/client';
 import * as fs from 'fs-extra';
 import { join } from 'path';
 
@@ -20,70 +19,86 @@ export class SubmissionsService {
     private readonly publisher: PublisherService,
   ) {}
 
-  async create(
-    dto: CreateSubmissionDto,
-    filePath: string | undefined,
-    traceId?: string,
-  ) {
-    // 학생 존재 확인
+  /** 제출 생성 */
+  async create(dto: CreateSubmissionDto, filePath?: string, traceId?: string) {
+    // 1. 학생 존재 확인
     const student = await this.prisma.student.findUnique({
       where: { id: dto.studentId },
     });
     if (!student) throw new BadRequestException('invalid studentId');
 
-    // 파일 경로 정규화
-    const relPath = filePath ? normalizeRelative(filePath) : undefined;
+    // 2. 제출 생성 + 최초 로그
+    const mediaCreates: Prisma.SubmissionMediaCreateWithoutSubmissionInput[] =
+      [];
 
-    // 1) DB 생성 (PENDING + 로그)
+    if (filePath) {
+      mediaCreates.push(
+        {
+          mediaType: 'VIDEO',
+          localPath: normalizeRelative(filePath),
+          blobUrl: null,
+        },
+        {
+          mediaType: 'AUDIO',
+          localPath: null, // 워커에서 추출 후 업데이트 예정
+          blobUrl: null,
+        },
+      );
+    }
+
     const submission = await this.prisma.submission.create({
       data: {
         studentId: dto.studentId,
         componentType: dto.componentType,
         submitText: dto.submitText,
         status: 'PENDING',
-        ...(relPath ? { videoPath: relPath } : {}),
+        ...(mediaCreates.length > 0 && {
+          media: {
+            create: mediaCreates,
+          },
+        }),
         logs: {
-          create: [
-            {
-              phase: 'api',
-              uri: '/api/v1/submissions',
-              status: 'ok',
-              traceId,
-              message: 'created',
-            },
-          ],
+          create: {
+            phase: 'create',
+            status: 'ok',
+            traceId,
+            message: 'submission created',
+            uri: '/v1/submissions',
+          },
         },
+      },
+      include: {
+        media: true,
+        logs: true,
       },
     });
 
-    // 2) 큐 발행 시도
+    // 3. 큐 발행 시도
     try {
       await this.publisher.enqueueProcessJob({
         submissionId: submission.id,
         traceId,
         filePath,
       });
-      // 큐 발행 로그 추가
+
       await this.prisma.submissionLog.create({
         data: {
           submissionId: submission.id,
-          phase: 'api',
-          uri: '/api/v1/submissions',
+          phase: 'enqueue',
           status: 'ok',
           traceId,
           message: 'enqueued',
+          uri: '/v1/submissions',
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
 
-      // 실패 시 로그 + 상태/에러 업데이트
       await this.prisma.$transaction([
         this.prisma.submissionLog.create({
           data: {
             submissionId: submission.id,
-            phase: 'api',
-            uri: '/api/v1/submissions',
+            phase: 'enqueue',
             status: 'failed',
             traceId,
             message,
@@ -91,16 +106,17 @@ export class SubmissionsService {
         }),
         this.prisma.submission.update({
           where: { id: submission.id },
-          data: { status: 'FAILED', lastError: 'enqueue failed' },
+          data: { status: 'FAILED', lastError: message }, // lastError는 스키마에서 제거했으므로 삭제
         }),
       ]);
-      // 필요시 throw 대신 ok 래핑 맞추려면 컨트롤러에서 표준 응답으로 변환
+
       throw err;
     }
 
     return submission;
   }
 
+  /** 제출 목록 */
   async list(q: ListQueryDto) {
     const page = q.page ?? 1;
     const size = q.size ?? 10;
@@ -120,7 +136,12 @@ export class SubmissionsService {
         orderBy: { [q.sort ?? 'createdAt']: q.order ?? 'desc' },
         skip,
         take: size,
-        include: { student: true },
+        include: {
+          student: true,
+          media: true,
+          logs: true,
+          revisions: true,
+        },
       }),
       this.prisma.submission.count({ where }),
     ]);
@@ -128,16 +149,22 @@ export class SubmissionsService {
     return { items, total, page, size };
   }
 
+  /** 제출 단건 조회 */
   async get(id: number) {
     const data = await this.prisma.submission.findUnique({
       where: { id },
-      include: { logs: true, revisions: true, student: true },
+      include: {
+        student: true,
+        media: true,
+        logs: true,
+        revisions: true,
+      },
     });
     if (!data) throw new NotFoundException('submission not found');
     return data;
   }
 
-  /** 업로드 경로 보장 (비동기) */
+  /** 업로드 디렉토리 보장 */
   async ensureUploadDir() {
     const dir = join(process.cwd(), 'uploads', 'tmp');
     await fs.ensureDir(dir);

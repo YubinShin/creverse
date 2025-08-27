@@ -53,11 +53,16 @@ export class PublisherService {
     return { status: 'queued', submissionId, traceId, queue: this.queueName };
   }
 
-  public async enqueueProcessJob(data: ProcessJob, traceId?: string) {
+  public async enqueueProcessJob(data: ProcessJob) {
+    console.log(data);
     await this.q.add('process-job', data, {
       removeOnComplete: 50,
       removeOnFail: 100,
     });
-    return { status: 'queued', traceId, submissionId: data.submissionId };
+    return {
+      status: 'queued',
+      traceId: data.traceId,
+      submissionId: data.submissionId,
+    };
   }
 }

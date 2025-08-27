@@ -37,23 +37,19 @@ export class JobsProcessor extends WorkerHost {
     const jobId = job.id ?? 'unknown';
 
     this.logger.setTraceId(traceId ?? String(jobId));
-    const log = this.logger.child({
-      jobId,
-      submissionId,
-      phase: 'worker',
-    });
-
+    const log = this.logger.child({ jobId, submissionId, phase: 'worker' });
     log.log({ event: 'job.start', filePath });
 
     try {
       const sub = await this.markProcessing(submissionId);
 
-      const { mp4Url, mp3Url, outMp3 } = await this.handleMediaProcessing(
-        submissionId,
-        traceId ?? '',
-        filePath,
-        log,
-      );
+      const { mp4Url, mp3Url, outMp3, outMp4, width, height } =
+        await this.handleMediaProcessing(
+          submissionId,
+          traceId ?? '',
+          filePath,
+          log,
+        );
       await this.verifySasUrls(traceId ?? '', mp4Url, mp3Url, log);
 
       const ai = await this.runAiEvaluation(
@@ -61,16 +57,20 @@ export class JobsProcessor extends WorkerHost {
         sub.componentType,
         traceId ?? '',
         log,
+        submissionId,
       );
 
       await this.updateSubmissionResult(submissionId, {
         mp4Url,
         mp3Url,
         outMp3,
+        outMp4,
         ai,
         submitText: sub.submitText ?? '',
         started,
         log,
+        width,
+        height,
       });
 
       log.log({ event: 'job.completed', score: ai.score });
@@ -82,10 +82,25 @@ export class JobsProcessor extends WorkerHost {
       };
     } catch (e: unknown) {
       const err = e instanceof Error ? e : new Error(String(e));
-      await this.prisma.submission.update({
-        where: { id: submissionId },
-        data: { status: 'FAILED', lastError: err.message },
-      });
+      await this.prisma.$transaction([
+        this.prisma.submission.update({
+          where: { id: submissionId },
+          data: {
+            status: 'FAILED',
+            lastError: err.message,
+          },
+        }),
+        this.prisma.submissionLog.create({
+          data: {
+            submissionId,
+            phase: 'worker',
+            status: 'failed',
+            traceId,
+            uri: 'worker:jobs#process',
+            message: err.message,
+          },
+        }),
+      ]);
 
       log.error({ event: 'job.failed', msg: err.message, stack: err.stack });
       await this.alert.notifyOnFailure(`job.failed: ${err.message}`, {
@@ -98,8 +113,8 @@ export class JobsProcessor extends WorkerHost {
         data: {
           submissionId,
           phase: 'worker',
-          uri: 'worker:jobs#process',
           status: 'ok',
+          uri: 'worker:jobs#process',
           traceId,
           latencyMs: Date.now() - started,
           message: 'done',
@@ -176,7 +191,7 @@ export class JobsProcessor extends WorkerHost {
     );
     log.log({ event: 'phase.azure-upload.ok', mp4Url, mp3Url });
 
-    return { mp4Url, mp3Url, outMp3 };
+    return { mp4Url, mp3Url, outMp4, outMp3, width, height };
   }
 
   private async verifySasUrls(
@@ -198,14 +213,31 @@ export class JobsProcessor extends WorkerHost {
     componentType: string,
     traceId: string,
     log: LoggerService,
+    submissionId: number,
   ) {
+    const started = Date.now();
     log.log({ event: 'phase.ai-evaluate.start' });
+
     const result = await this.ai.evaluate({
       submitText: text,
       componentType,
       traceId,
     });
-    log.log({ event: 'phase.ai-evaluate.ok' });
+
+    const latency = Date.now() - started;
+    await this.prisma.submissionLog.create({
+      data: {
+        submissionId,
+        phase: 'ai',
+        status: 'ok',
+        traceId,
+        latencyMs: latency,
+        message: 'ai evaluation completed',
+        uri: 'worker:jobs#process',
+      },
+    });
+
+    log.log({ event: 'phase.ai-evaluate.ok', latencyMs: latency });
     return result;
   }
 
@@ -215,30 +247,72 @@ export class JobsProcessor extends WorkerHost {
       mp4Url: string;
       mp3Url: string;
       outMp3: string;
+      outMp4: string;
       ai: { score: number; feedback: string; highlights: string[] };
       submitText: string;
       started: number;
       log: LoggerService;
+      width: number;
+      height: number;
     },
   ) {
-    const { mp4Url, mp3Url, outMp3, ai, submitText, started, log } = opts;
+    const { mp4Url, mp3Url, outMp3, outMp4, ai, log, width, height } = opts;
 
     log.log({ event: 'phase.db-update.start' });
-    await this.prisma.submission.update({
-      where: { id: submissionId },
-      data: {
-        status: 'COMPLETED',
-        videoUrl: mp4Url,
-        audioUrl: mp3Url,
-        audioPath: outMp3,
-        score: Math.max(0, Math.min(10, Math.floor(ai.score))),
-        feedback: ai.feedback?.slice(0, 2000) ?? null,
-        highlights: ai.highlights as Prisma.InputJsonValue,
-        highlightSubmitText: highlightHtmlByStrings(submitText, ai.highlights),
-        apiLatency: Date.now() - started,
-        lastError: null,
-      },
-    });
+
+    await this.prisma.$transaction([
+      this.prisma.submission.update({
+        where: { id: submissionId },
+        data: {
+          status: 'COMPLETED',
+          score: Math.max(0, Math.min(10, Math.floor(ai.score))),
+          feedback: ai.feedback?.slice(0, 2000) ?? null,
+          resultJson: {
+            score: ai.score,
+            highlights: ai.highlights,
+          } as Prisma.InputJsonValue,
+          updatedAt: new Date(),
+        },
+      }),
+
+      this.prisma.submissionMedia.upsert({
+        where: {
+          submissionId_mediaType: {
+            submissionId,
+            mediaType: 'VIDEO',
+          },
+        },
+        update: {
+          blobUrl: mp4Url,
+          localPath: outMp4,
+          metadata: { width, height },
+        },
+        create: {
+          submissionId,
+          mediaType: 'VIDEO',
+          blobUrl: mp4Url,
+          localPath: outMp4,
+          metadata: { width, height },
+        },
+      }),
+
+      this.prisma.submissionMedia.upsert({
+        where: {
+          submissionId_mediaType: {
+            submissionId,
+            mediaType: 'AUDIO',
+          },
+        },
+        update: { blobUrl: mp3Url, localPath: outMp3 },
+        create: {
+          submissionId,
+          mediaType: 'AUDIO',
+          blobUrl: mp3Url,
+          localPath: outMp3,
+        },
+      }),
+    ]);
+
     log.log({ event: 'phase.db-update.ok' });
   }
 }
