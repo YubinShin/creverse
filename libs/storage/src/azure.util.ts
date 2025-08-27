@@ -34,26 +34,25 @@ export class AzureStorage {
     ttlMinutes = 60,
     traceId?: string,
   ): Promise<string> {
+    const log = this.logger.child({ traceId, context: 'AzureStorage' }); // ✅ 안전하게 child logger 사용
     const bp = normalize(blobPath);
 
     try {
       const created = await this.containerClient.createIfNotExists();
-      this.logger.debug(
-        `[azure] createIfNotExists=${created.succeeded}`,
-        'AzureStorage',
-      );
+      log.debug({ action: 'createIfNotExists', result: created.succeeded });
     } catch (e: unknown) {
-      const err = e as Error;
-      this.logger.error(
-        `[azure] createIfNotExists failed: ${explainAzureError(err)}`,
-        err.stack,
-        'AzureStorage',
-      );
+      const err = e instanceof Error ? e : new Error(String(e));
+      log.error({
+        action: 'createIfNotExists',
+        status: 'failed',
+        message: explainAzureError(err),
+        stack: err.stack,
+      });
       throw err;
     }
 
     const exists = await this.containerClient.exists();
-    this.logger.debug(`[azure] container.exists()=${exists}`, 'AzureStorage');
+    log.debug({ action: 'container.exists', result: exists });
 
     const blob = this.containerClient.getBlockBlobClient(bp);
 
@@ -71,30 +70,22 @@ export class AzureStorage {
         },
       });
 
-      this.logger.log(
-        {
-          traceId,
-          action: 'azure_upload',
-          path: bp,
-          status: 'ok',
-          latency: Date.now() - start,
-        },
-        'AzureStorage',
-      );
+      log.info({
+        action: 'azure_upload',
+        path: bp,
+        status: 'ok',
+        latency: Date.now() - start,
+      });
     } catch (e: unknown) {
-      const err = e as Error;
-      this.logger.error(
-        {
-          traceId,
-          action: 'azure_upload',
-          path: bp,
-          status: 'failed',
-          latency: Date.now() - start,
-          message: explainAzureError(err),
-        },
-        err.stack,
-        'AzureStorage',
-      );
+      const err = e instanceof Error ? e : new Error(String(e));
+      log.error({
+        action: 'azure_upload',
+        path: bp,
+        status: 'failed',
+        latency: Date.now() - start,
+        message: explainAzureError(err),
+        stack: err.stack,
+      });
       throw err;
     }
 

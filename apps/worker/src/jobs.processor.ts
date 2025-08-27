@@ -4,8 +4,9 @@ import { sanitizeCropRectForVideo } from '@app/common/media/crop-utils';
 import { cropVideo } from '@app/common/media/cropper';
 import { extractMp3 } from '@app/common/media/mp3-extractor';
 import { getVideoSizeFast } from '@app/common/media/video-meta';
+import { LoggerService } from '@app/logger';
 import { PrismaService } from '@app/prisma';
-import { AzureStorage } from '@app/storage'; // 예: libs/storage/src/azure.util.ts에서 export
+import { AzureStorage } from '@app/storage';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
@@ -18,6 +19,7 @@ export class JobsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly storage: AzureStorage,
     private readonly ai: AiService,
+    private readonly logger: LoggerService,
   ) {
     super();
   }
@@ -25,36 +27,33 @@ export class JobsProcessor extends WorkerHost {
   async process(job: Job<ProcessJob>) {
     const { submissionId, traceId, filePath } = job.data;
     const started = Date.now();
-    const phaseUri = 'worker:jobs#process';
+    const jobId = job.id ?? 'unknown';
 
-    const log = (status: 'ok' | 'failed', message: string) =>
-      this.prisma.submissionLog.create({
-        data: {
-          submissionId,
-          phase: 'worker',
-          uri: phaseUri,
-          status,
-          traceId,
-          message,
-        },
-      });
+    this.logger.setTraceId(traceId ?? String(jobId));
+    const log = this.logger.child({
+      jobId,
+      submissionId,
+      phase: 'worker',
+    });
 
-    console.log('[worker] start', job.id, job.data);
+    log.log({ event: 'job.start', filePath });
 
     try {
       const sub = await this.markProcessing(submissionId);
 
       const { mp4Url, mp3Url, outMp3 } = await this.handleMediaProcessing(
         submissionId,
-        traceId!,
+        traceId ?? '',
         filePath,
+        log,
       );
-      await this.verifySasUrls(mp4Url, mp3Url);
+      await this.verifySasUrls(mp4Url, mp3Url, log);
 
       const ai = await this.runAiEvaluation(
-        sub.submitText,
+        sub.submitText ?? '',
         sub.componentType,
-        traceId!,
+        traceId ?? '',
+        log,
       );
 
       await this.updateSubmissionResult(submissionId, {
@@ -62,43 +61,55 @@ export class JobsProcessor extends WorkerHost {
         mp3Url,
         outMp3,
         ai,
-        submitText: sub.submitText,
+        submitText: sub.submitText ?? '',
         started,
+        log,
       });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+
+      log.log({ event: 'job.completed', score: ai.score });
+      return {
+        status: 'COMPLETED',
+        submissionId,
+        score: ai.score,
+        feedback: ai.feedback,
+      };
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error(String(e));
       await this.prisma.submission.update({
-        where: { id: job.data.submissionId },
-        data: { status: 'FAILED', lastError: msg },
+        where: { id: submissionId },
+        data: { status: 'FAILED', lastError: err.message },
       });
-      await log('failed', msg);
-      // void notifyOnFailure(
-      //   `[worker] submission ${job.data.submissionId} failed: ${msg}`,
-      //   { traceId, channel: 'slack' },
-      // );
-      console.error('[worker] failed', job.id, msg);
-      throw e;
+
+      log.error({ event: 'job.failed', msg: err.message, stack: err.stack });
+      throw err;
     } finally {
       await this.prisma.submissionLog.create({
         data: {
           submissionId,
           phase: 'worker',
-          uri: phaseUri,
+          uri: 'worker:jobs#process',
           status: 'ok',
           traceId,
           latencyMs: Date.now() - started,
           message: 'done',
         },
       });
+      log.debug({ event: 'job.finally', latencyMs: Date.now() - started });
     }
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, err: Error) {
-    console.error('[worker:event] failed', job.id, err.message);
+    this.logger.error({
+      event: 'worker.event.failed',
+      jobId: job.id ?? 'unknown',
+      error: err.stack,
+    });
   }
 
-  private async markProcessing(submissionId: number) {
+  private async markProcessing(
+    submissionId: number,
+  ): Promise<{ id: number; componentType: string; submitText: string | null }> {
     return this.prisma.submission.update({
       where: { id: submissionId },
       data: { status: 'PROCESSING' },
@@ -109,7 +120,8 @@ export class JobsProcessor extends WorkerHost {
   private async handleMediaProcessing(
     submissionId: number,
     traceId: string,
-    filePath?: string,
+    filePath: string | undefined,
+    log: LoggerService,
   ) {
     if (!filePath) throw new Error('missing input video path');
 
@@ -131,12 +143,12 @@ export class JobsProcessor extends WorkerHost {
       h: height,
     };
     const rect = sanitizeCropRectForVideo(rawRect, width, height);
-    console.log('[worker] input=', width, 'x', height, 'rect=', rect);
+    log.log({ event: 'crop.rect', width, height, rect });
 
     await cropVideo(filePath, outMp4, rect);
     await extractMp3(filePath, outMp3);
 
-    console.log('[phase] azure-upload start');
+    log.log({ event: 'phase.azure-upload.start' });
     const mp4Url = await this.storage.uploadFileAndGetSas(
       `submissions/${submissionId}/video.mp4`,
       outMp4,
@@ -151,29 +163,34 @@ export class JobsProcessor extends WorkerHost {
       60,
       traceId,
     );
-    console.log('[phase] azure-upload ok', { mp4Url, mp3Url });
+    log.log({ event: 'phase.azure-upload.ok', mp4Url, mp3Url });
 
     return { mp4Url, mp3Url, outMp3 };
   }
 
-  private async verifySasUrls(mp4Url: string, mp3Url: string) {
-    console.log('[phase] sas-verify start');
+  private async verifySasUrls(
+    mp4Url: string,
+    mp3Url: string,
+    log: LoggerService,
+  ) {
+    log.log({ event: 'phase.sas-verify.start' });
     const [v1, v2] = await Promise.all([fetchHead(mp4Url), fetchHead(mp3Url)]);
-    console.log('[phase] sas-verify ok', v1, v2);
+    log.log({ event: 'phase.sas-verify.ok', v1, v2 });
   }
 
   private async runAiEvaluation(
     text: string,
     componentType: string,
     traceId: string,
+    log: LoggerService,
   ) {
-    console.log('[phase] ai-evaluate start');
+    log.log({ event: 'phase.ai-evaluate.start' });
     const result = await this.ai.evaluate({
-      submitText: text ?? '',
+      submitText: text,
       componentType,
       traceId,
     });
-    console.log('[phase] ai-evaluate ok');
+    log.log({ event: 'phase.ai-evaluate.ok' });
     return result;
   }
 
@@ -183,14 +200,15 @@ export class JobsProcessor extends WorkerHost {
       mp4Url: string;
       mp3Url: string;
       outMp3: string;
-      ai: { score: number; feedback: string; highlights: any[] };
+      ai: { score: number; feedback: string; highlights: string[] };
       submitText: string;
       started: number;
+      log: LoggerService;
     },
   ) {
-    const { mp4Url, mp3Url, outMp3, ai, submitText, started } = opts;
+    const { mp4Url, mp3Url, outMp3, ai, submitText, started, log } = opts;
 
-    console.log('[phase] db-update start');
+    log.log({ event: 'phase.db-update.start' });
     await this.prisma.submission.update({
       where: { id: submissionId },
       data: {
@@ -201,15 +219,12 @@ export class JobsProcessor extends WorkerHost {
         score: Math.max(0, Math.min(10, Math.floor(ai.score))),
         feedback: ai.feedback?.slice(0, 2000) ?? null,
         highlights: ai.highlights as Prisma.InputJsonValue,
-        highlightSubmitText: highlightHtmlByStrings(
-          submitText ?? '',
-          ai.highlights,
-        ),
+        highlightSubmitText: highlightHtmlByStrings(submitText, ai.highlights),
         apiLatency: Date.now() - started,
         lastError: null,
       },
     });
-    console.log('[phase] db-update ok');
+    log.log({ event: 'phase.db-update.ok' });
   }
 }
 
@@ -219,48 +234,10 @@ async function fetchHead(url: string) {
   return { status: res.status, len: res.headers.get('content-length') };
 }
 
-// 간단 하이라이트(겹침/범위오류 방지)
-function highlightHtml(
-  text: string,
-  spans: Array<{ start: number; end: number }>,
-) {
-  if (!spans?.length || !text) return text;
-  const n = text.length;
-  const sorted = [...spans]
-    .map(({ start, end }) => ({
-      s: Math.max(0, Math.min(n, start | 0)),
-      e: Math.max(0, Math.min(n, end | 0)),
-    }))
-    .filter(({ s, e }) => e > s)
-    .sort((a, b) => a.s - b.s);
-
-  const merged: Array<{ s: number; e: number }> = [];
-  for (const r of sorted) {
-    if (!merged.length || r.s > merged[merged.length - 1].e)
-      merged.push({ ...r });
-    else
-      merged[merged.length - 1].e = Math.max(merged[merged.length - 1].e, r.e);
-  }
-
-  let out = '',
-    cur = 0;
-  for (const { s, e } of merged) {
-    out +=
-      escapeHtml(text.slice(cur, s)) +
-      '<b>' +
-      escapeHtml(text.slice(s, e)) +
-      '</b>';
-    cur = e;
-  }
-  out += escapeHtml(text.slice(cur));
-  return out;
-}
-
 // 문자열 목록으로 하이라이트 (겹침 최소화, 간단 매칭)
 function highlightHtmlByStrings(text: string, items: string[]) {
   if (!text || !items?.length) return escapeHtml(text);
 
-  // 중복 제거 + 공백 정리 + 긴 문자열 우선
   const needles = [
     ...new Set(items.map((s) => s?.trim()).filter(Boolean)),
   ].sort((a, b) => b.length - a.length);
@@ -268,7 +245,6 @@ function highlightHtmlByStrings(text: string, items: string[]) {
   let out = escapeHtml(text);
   for (const n of needles) {
     const esc = escapeRegExp(n);
-    // 전역(g) 치환 — 이미 <b>로 감싼 내부까지 다시 감싸지 않도록 escapeHtml 이후에 처리
     out = out.replace(new RegExp(esc, 'g'), (m) => `<b>${escapeHtml(m)}</b>`);
   }
   return out;
